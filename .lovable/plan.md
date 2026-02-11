@@ -1,62 +1,56 @@
 
 
-## Anika Velocity Pipeline Stages
+## SOP Wiki -- Cheat Sheet Mode Redesign
 
-Replace the current 5-stage pipeline with the 7-stage "Anika Velocity" flow designed for last-mile logistics.
-
-### Stage Mapping
-
-| Current Stage | New Stage | Description |
-|---|---|---|
-| New Lead | New Lead | Raw data (inquiry, cold list, referral) |
-| First Contact | Qualified / Needs Analysis | Confirmed local volume, know what they ship |
-| Quote Sent | Quote Sent / Proposal | Hotshot or Standard Courier rates sent |
-| Negotiation | Operational Review | Dispatchers check locations, dock access, White-Glove needs |
-| Account Won | Trial Run / Pilot | 1-3 test deliveries to prove speed |
-| *(new)* | Account Active | Recurring client |
-| *(new)* | Retention / Quarterly Check-in | Ensure we stay their #1 choice |
+Make the SOP Wiki more user-friendly by adding a "Cheat Sheet" inline reading experience so dispatchers can quickly scan procedures without opening dialogs.
 
 ---
 
-### Changes
+### What Changes
 
-**1. Database migration** -- Add the 3 new enum values to `lead_stage`:
+**1. Replace "click-to-open-dialog" with inline expandable cards (Accordion style)**
 
-```text
-ALTER TYPE lead_stage ADD VALUE IF NOT EXISTS 'qualified';
-ALTER TYPE lead_stage ADD VALUE IF NOT EXISTS 'operational_review';
-ALTER TYPE lead_stage ADD VALUE IF NOT EXISTS 'trial_run';
-ALTER TYPE lead_stage ADD VALUE IF NOT EXISTS 'account_active';
-ALTER TYPE lead_stage ADD VALUE IF NOT EXISTS 'retention';
-```
+Instead of clicking a card and reading content in a popup dialog, each article becomes an expandable accordion card. Click the title and the full content unfolds right there -- like a cheat sheet you can scan up and down.
 
-The old values (`first_contact`, `negotiation`, `account_won`) remain in the enum so existing leads don't break, but the UI will show the new stage names.
+**2. Two view modes: Grid View and Cheat Sheet View**
 
-**2. Update `src/lib/constants.ts`** -- Replace the `LEAD_STAGES` array:
+- **Grid View** (current) -- compact cards for browsing, good when you have many articles
+- **Cheat Sheet View** (new default) -- a single-column list of expandable accordion cards grouped by category, so dispatchers see all relevant procedures at a glance
 
-```text
-LEAD_STAGES = [
-  { value: "new_lead", label: "New Lead" },
-  { value: "qualified", label: "Qualified / Needs Analysis" },
-  { value: "quote_sent", label: "Quote Sent / Proposal" },
-  { value: "operational_review", label: "Operational Review" },
-  { value: "trial_run", label: "Trial Run / Pilot" },
-  { value: "account_active", label: "Account Active" },
-  { value: "retention", label: "Retention / Check-in" },
-]
-```
+A toggle button lets users switch between the two views.
 
-**3. Update `src/pages/Pipeline.tsx`** -- The Kanban board already renders columns dynamically from the `LEAD_STAGES` constant, so it will automatically show 7 columns. Minor adjustments:
-- Slightly narrower column min-widths to fit 7 stages on screen
-- Add horizontal scroll if needed for smaller viewports
+**3. Category sections in Cheat Sheet mode**
 
-**4. Migrate existing lead data** -- Any leads currently in `first_contact`, `negotiation`, or `account_won` will still display but won't have a visible column unless we map them. We'll update existing leads to the new stages:
+In Cheat Sheet view, articles are grouped under category headers (General, Last-Mile, Hotshot, Onboarding). Each category is a collapsible section. When a category filter is active, only that category shows -- acting like a focused cheat sheet for that topic.
 
-```text
-UPDATE leads SET stage = 'qualified' WHERE stage = 'first_contact';
-UPDATE leads SET stage = 'operational_review' WHERE stage = 'negotiation';
-UPDATE leads SET stage = 'account_active' WHERE stage = 'account_won';
-```
+**4. Search highlights matches in content too**
 
-This ensures no leads are orphaned in invisible columns.
+Currently search only filters by title. Update it to also search within content text, so dispatchers can type "after 5 PM" and find the relevant hotshot procedure even if the title doesn't mention it.
 
+**5. Better empty state with quick-start suggestions**
+
+When no articles exist, show helpful prompts like "Start by adding your first Last-Mile procedure" with category-specific quick-create buttons.
+
+**6. Keep the View Dialog for Grid mode only**
+
+The existing click-to-view dialog stays for Grid mode. In Cheat Sheet mode, content is inline so no dialog is needed.
+
+---
+
+### Technical Details
+
+**File modified:** `src/pages/SopWiki.tsx`
+
+**Changes:**
+
+| Area | Details |
+|---|---|
+| State | Add `viewMode` state: `"cheatsheet"` (default) or `"grid"` |
+| Search | Update filter to also match `article.content.toLowerCase()` |
+| Cheat Sheet view | Use Radix Accordion (`@radix-ui/react-accordion`, already installed) to render articles as expandable items grouped by category |
+| Category grouping | Group filtered articles by `article.category`, render each group under a heading |
+| View toggle | Add a small toggle button group (List icon / Grid icon) next to the search bar |
+| Styling | Each accordion item shows title + category badge when collapsed; expands to show full content with edit/delete buttons inline |
+| Grid view | Keeps existing card grid with click-to-view dialog behavior |
+
+**No database changes needed.** All changes are UI-only within `SopWiki.tsx`.
