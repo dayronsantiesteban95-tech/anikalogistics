@@ -12,15 +12,34 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const sb = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Validate JWT
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await sb.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { messages } = await req.json();
 
-    // Extract auth token to query on behalf of user
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, supabaseKey);
-
-    // Gather CRM context for the AI
+    // Gather CRM context using user-scoped client (respects RLS)
     const [leadsRes, tasksRes, pipelineRes] = await Promise.all([
       sb.from("leads").select("id, company_name, contact_person, stage, city_hub, service_type, avg_packages_day, delivery_radius_miles, vehicle_type, sla_requirement, email, phone, estimated_monthly_loads, next_action_date, industry").limit(100),
       sb.from("tasks").select("id, title, status, priority, department, due_date, description").limit(100),
