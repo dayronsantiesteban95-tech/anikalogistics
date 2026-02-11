@@ -5,7 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, CheckSquare, AlertTriangle, Users, Building2, UserCheck, CalendarClock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TrendingUp, CheckSquare, AlertTriangle, Users, Building2, UserCheck, CalendarClock, BarChart3 } from "lucide-react";
 import { LEAD_STAGES, TASK_PRIORITIES, TASK_STATUSES, DEPARTMENTS } from "@/lib/constants";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import type { Tables } from "@/integrations/supabase/types";
@@ -25,10 +26,35 @@ const deptLabel = (dept: string | null) => {
   return d?.label ?? dept;
 };
 
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-4 w-56 mt-2" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 rounded-2xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Skeleton className="h-72 rounded-2xl" />
+        <Skeleton className="h-72 rounded-2xl" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Skeleton className="h-64 rounded-2xl lg:col-span-2" />
+        <Skeleton className="h-64 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isOwner } = useUserRole();
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ leads: 0, tasksDueToday: 0, overdue: 0, wonAccounts: 0, companies: 0, contacts: 0 });
   const [pipelineCounts, setPipelineCounts] = useState<{ name: string; value: number }[]>([]);
   const [recentActivity, setRecentActivity] = useState<{ id: string; note: string; activity_type: string; created_at: string }[]>([]);
@@ -41,7 +67,6 @@ export default function Dashboard() {
       const today = new Date().toISOString().split("T")[0];
       const userId = user!.id;
 
-      // Tasks queries - dispatchers only see their assigned tasks
       let tasksTodayQuery = supabase.from("tasks").select("id", { count: "exact", head: true }).eq("due_date", today).neq("status", "done");
       if (!isOwner) tasksTodayQuery = tasksTodayQuery.eq("assigned_to", userId);
 
@@ -68,7 +93,6 @@ export default function Dashboard() {
       allLeads?.forEach((l) => { counts[l.stage] = (counts[l.stage] || 0) + 1; });
       setPipelineCounts(LEAD_STAGES.map((s) => ({ name: s.label, value: counts[s.value] })));
 
-      // Activity - owners see all, dispatchers see their own
       let activityQuery = supabase
         .from("lead_interactions")
         .select("id, note, activity_type, created_at")
@@ -78,7 +102,6 @@ export default function Dashboard() {
       const { data: activity } = await activityQuery;
       if (activity) setRecentActivity(activity);
 
-      // Upcoming tasks - dispatchers only see assigned
       let tasksQuery = supabase
         .from("tasks")
         .select("*")
@@ -90,7 +113,6 @@ export default function Dashboard() {
       const { data: tasks } = await tasksQuery;
       if (tasks) setUpcomingTasks(tasks);
 
-      // Task status - dispatchers only see their tasks
       let allTasksQuery = supabase.from("tasks").select("status");
       if (!isOwner) allTasksQuery = allTasksQuery.eq("assigned_to", userId);
       const { data: allTasks } = await allTasksQuery;
@@ -98,9 +120,13 @@ export default function Dashboard() {
       TASK_STATUSES.forEach((s) => (statusCounts[s.value] = 0));
       allTasks?.forEach((t) => { statusCounts[t.status] = (statusCounts[t.status] || 0) + 1; });
       setTaskStatusCounts(TASK_STATUSES.map((s) => ({ name: s.label, value: statusCounts[s.value] })));
+
+      setLoading(false);
     }
     fetchStats();
   }, [user, isOwner]);
+
+  if (loading) return <DashboardSkeleton />;
 
   const statCards = [
     { label: "Active Leads", value: stats.leads, icon: TrendingUp, color: "text-accent" },
@@ -112,8 +138,8 @@ export default function Dashboard() {
   ];
 
   const activityTypeLabel: Record<string, string> = { note: "📝", email: "📧", call: "📞", meeting: "🤝" };
-
   const today = new Date().toISOString().split("T")[0];
+  const hasPipelineData = pipelineCounts.some((p) => p.value > 0);
 
   return (
     <div className="space-y-6">
@@ -147,18 +173,26 @@ export default function Dashboard() {
             <CardTitle className="text-base font-semibold">Pipeline Funnel</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={pipelineCounts} layout="vertical" margin={{ left: 0 }}>
-                <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                  {pipelineCounts.map((_, i) => (
-                    <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {hasPipelineData ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={pipelineCounts} layout="vertical" margin={{ left: 0 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                    {pipelineCounts.map((_, i) => (
+                      <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[220px] text-muted-foreground">
+                <BarChart3 className="h-10 w-10 mb-3 opacity-40" />
+                <p className="font-medium text-sm">No leads in pipeline yet</p>
+                <p className="text-xs">Start prospecting to see your funnel here.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -265,4 +299,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
