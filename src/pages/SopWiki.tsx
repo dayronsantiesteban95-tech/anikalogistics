@@ -14,7 +14,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Pencil, Trash2, BookOpen } from "lucide-react";
+import {
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Plus, Search, Pencil, Trash2, BookOpen, LayoutGrid, List } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,6 +31,8 @@ type SopArticle = {
   updated_at: string;
 };
 
+type ViewMode = "cheatsheet" | "grid";
+
 export default function SopWiki() {
   const [articles, setArticles] = useState<SopArticle[]>([]);
   const [search, setSearch] = useState("");
@@ -36,6 +41,7 @@ export default function SopWiki() {
   const [editArticle, setEditArticle] = useState<SopArticle | null>(null);
   const [viewArticle, setViewArticle] = useState<SopArticle | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("cheatsheet");
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -79,7 +85,8 @@ export default function SopWiki() {
   };
 
   const filtered = articles.filter((a) => {
-    if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false;
+    const q = search.toLowerCase();
+    if (q && !a.title.toLowerCase().includes(q) && !a.content.toLowerCase().includes(q)) return false;
     if (categoryFilter !== "all" && a.category !== categoryFilter) return false;
     return true;
   });
@@ -87,6 +94,20 @@ export default function SopWiki() {
   const getCategoryLabel = (val: string) => SOP_CATEGORIES.find(c => c.value === val)?.label ?? val;
 
   const isFormOpen = showForm || !!editArticle;
+
+  // Group filtered articles by category for cheat sheet view
+  const groupedByCategory = SOP_CATEGORIES
+    .map((cat) => ({
+      ...cat,
+      articles: filtered.filter((a) => a.category === cat.value),
+    }))
+    .filter((g) => g.articles.length > 0);
+
+  const openCreateWithCategory = (category: string) => {
+    setEditArticle(null);
+    setShowForm(true);
+    setCategoryFilter(category);
+  };
 
   return (
     <div className="space-y-4">
@@ -102,7 +123,7 @@ export default function SopWiki() {
         </Button>
       </div>
 
-      {/* Filters */}
+      {/* Filters & View Toggle */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-56">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -116,42 +137,96 @@ export default function SopWiki() {
             </Button>
           ))}
         </div>
+        <div className="ml-auto flex gap-1 border rounded-md p-0.5">
+          <Button variant={viewMode === "cheatsheet" ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setViewMode("cheatsheet")} title="Cheat Sheet">
+            <List className="h-4 w-4" />
+          </Button>
+          <Button variant={viewMode === "grid" ? "default" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setViewMode("grid")} title="Grid View">
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Articles Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((article) => (
-          <Card
-            key={article.id}
-            className="cursor-pointer hover:shadow-md transition-all group"
-            onClick={() => setViewArticle(article)}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-base leading-tight">{article.title}</CardTitle>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); setEditArticle(article); setShowForm(true); }} className="p-1 rounded hover:bg-muted">
-                    <Pencil className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteId(article.id); }} className="p-1 rounded hover:bg-destructive/10">
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Badge variant="secondary" className="text-[10px]">{getCategoryLabel(article.category)}</Badge>
-              <p className="text-xs text-muted-foreground line-clamp-3">{article.content}</p>
-              <p className="text-[10px] text-muted-foreground">Updated {new Date(article.updated_at).toLocaleDateString()}</p>
-            </CardContent>
-          </Card>
-        ))}
-        {filtered.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            No articles found. Create your first SOP article!
+      {/* Content */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 space-y-4">
+          <p className="text-muted-foreground">No articles found. Start building your playbook!</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {SOP_CATEGORIES.map((c) => (
+              <Button key={c.value} variant="outline" size="sm" onClick={() => openCreateWithCategory(c.value)}>
+                <Plus className="h-3 w-3 mr-1" /> {c.label} procedure
+              </Button>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      ) : viewMode === "cheatsheet" ? (
+        /* Cheat Sheet View */
+        <div className="space-y-6">
+          {groupedByCategory.map((group) => (
+            <div key={group.value}>
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">{group.label}</h2>
+              <Accordion type="multiple" className="space-y-1">
+                {group.articles.map((article) => (
+                  <AccordionItem key={article.id} value={article.id} className="border rounded-lg px-4 bg-card">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-2 text-left">
+                        <span className="font-medium text-sm">{article.title}</span>
+                        <Badge variant="secondary" className="text-[10px] shrink-0">{getCategoryLabel(article.category)}</Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground pb-2">
+                        {article.content}
+                      </div>
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <span className="text-[10px] text-muted-foreground">Updated {new Date(article.updated_at).toLocaleDateString()}</span>
+                        <div className="ml-auto flex gap-1">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditArticle(article); setShowForm(true); }}>
+                            <Pencil className="h-3 w-3 mr-1" /> Edit
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteId(article.id)}>
+                            <Trash2 className="h-3 w-3 mr-1" /> Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Grid View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((article) => (
+            <Card
+              key={article.id}
+              className="cursor-pointer hover:shadow-md transition-all group"
+              onClick={() => setViewArticle(article)}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between">
+                  <CardTitle className="text-base leading-tight">{article.title}</CardTitle>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); setEditArticle(article); setShowForm(true); }} className="p-1 rounded hover:bg-muted">
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); setDeleteId(article.id); }} className="p-1 rounded hover:bg-destructive/10">
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Badge variant="secondary" className="text-[10px]">{getCategoryLabel(article.category)}</Badge>
+                <p className="text-xs text-muted-foreground line-clamp-3">{article.content}</p>
+                <p className="text-[10px] text-muted-foreground">Updated {new Date(article.updated_at).toLocaleDateString()}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* New/Edit Article Dialog */}
       <Dialog open={isFormOpen} onOpenChange={() => { setShowForm(false); setEditArticle(null); }}>
@@ -174,7 +249,7 @@ export default function SopWiki() {
         </DialogContent>
       </Dialog>
 
-      {/* View Article Dialog */}
+      {/* View Article Dialog (Grid mode only) */}
       <Dialog open={!!viewArticle} onOpenChange={() => setViewArticle(null)}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           {viewArticle && (
