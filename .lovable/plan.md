@@ -1,78 +1,100 @@
 
 
-## Sales Nurture Engine
+## Nurture Engine PRE Stage Enhancements
 
-Add a dedicated "Nurture" page to the CRM that manages pre-qualification outreach with sequence tracking, decision-tree logic, a template library, and a "follow-up today" view.
+Upgrade the Nurture Engine so the PRE outreach stage has configurable timing, template integration per step, a visual bifurcation flow, and end-of-sequence handling.
 
 ---
 
-### Overview
+### What Changes
 
-The Nurture Engine is a new page accessible from the sidebar under "Operations." It has **3 tabs**:
+**1. Configurable Sequence Cadence**
 
-1. **Follow-Up Today** (default) -- shows all leads needing action today based on their sequence follow-up dates
-2. **Sequence Tracker** -- per-lead view of outreach steps (Email 1, Email 2, Call) with bifurcation actions
-3. **Template Library** -- pre-written emails organized by Hub (Miami, Phoenix, LA) that dispatchers can copy/paste
+Currently the timing is hardcoded (Email 1 = today, Email 2 = +3 days, Call = +7 days). Add a settings panel (owners only) where they can configure:
+- Days between Email 1 and Email 2 (default: 3)
+- Days between Email 2 and Call (default: 4)
+- Days for "No Response" snooze (default: 3)
+
+These settings are stored in a new `nurture_settings` table so they persist across sessions.
+
+**2. Smart Template Suggestions on Each Step**
+
+When a dispatcher is working a sequence step, the system suggests the matching template based on the lead's hub and the step type. For example, if working Email 1 for a Miami lead, it automatically shows the Miami Email 1 template with a one-click "Copy" button -- no need to switch to the Template Library tab.
+
+**3. Visual Bifurcation Decision Tree**
+
+Add a visual flow diagram at the top of the Sequence Tracker tab showing the decision paths:
+
+```text
+[Email 1] --No Response--> [Email 2] --No Response--> [Call]
+    |                           |                        |
+  Replied                    Replied                  Replied
+    v                           v                        v
+ QUALIFIED                  QUALIFIED                QUALIFIED
+    |                           |                        |
+ Interested                Interested               Interested
+    v                           v                        v
+ GREEN FLAG                GREEN FLAG               GREEN FLAG
+```
+
+This acts as a visual reference for dispatchers to understand the flow at a glance.
+
+**4. End-of-Sequence Handling**
+
+When all 3 steps are exhausted with "No Response," the lead currently just sits there. Add two options:
+- **"Restart Sequence"** -- creates a new 3-step cycle with fresh dates
+- **"Mark Cold"** -- moves the lead to a `cold` status and removes it from the tracker
+
+A "Cold Leads" section appears at the bottom of the Sequence Tracker for leads marked cold, with a "Revive" button.
+
+**5. Step-Level Notes**
+
+Add a small text field on each bifurcation action so dispatchers can log a quick note (e.g., "Spoke with receptionist, call back Thursday"). This note gets saved to `lead_sequences` in a new `note` column.
+
+**6. Sequence Progress Bar**
+
+Each lead card in the tracker shows a mini progress bar (3 segments) indicating how far through the sequence they are, color-coded: gray (pending), blue (in progress), green (completed).
 
 ---
 
 ### Database Changes
 
-**Add a `response_status` column to `lead_sequences`** to support bifurcation logic:
+**New table: `nurture_settings`**
+
+| Column | Type | Default |
+|---|---|---|
+| id | uuid | gen_random_uuid() |
+| setting_key | text | (required) |
+| setting_value | text | (required) |
+| updated_by | uuid | nullable |
+| updated_at | timestamptz | now() |
+
+RLS: All authenticated can read; only owners can insert/update/delete.
+
+Default rows:
+- `email1_to_email2_days` = "3"
+- `email2_to_call_days` = "4"
+- `no_response_snooze_days` = "3"
+
+**Add column to `lead_sequences`:**
 
 ```text
-ALTER TABLE lead_sequences ADD COLUMN response_status text DEFAULT 'no_response';
--- Values: 'no_response', 'replied', 'interested_call'
+ALTER TABLE lead_sequences ADD COLUMN note text;
 ```
 
-No other table changes needed. The existing `lead_sequences` table already has `step_type`, `status`, `sent_at`, and `follow_up_date`. The existing `email_templates` table already has `name`, `hub`, `step_type`, `subject`, and `body`.
-
 ---
 
-### New Page: `src/pages/NurtureEngine.tsx`
+### UI Changes in `NurtureEngine.tsx`
 
-**Tab 1: Follow-Up Today**
-- Query `lead_sequences` where `follow_up_date <= today` and `status = 'pending'`
-- Join with `leads` to show company name, contact person, hub, industry
-- Each row shows: lead name, step type (Email 1 / Email 2 / Call), days overdue
-- Leads with `response_status = 'interested_call'` get a green highlight
-- Click a lead to open inline action panel
-
-**Tab 2: Sequence Tracker**
-- Shows all leads in `new_lead` stage with their outreach sequence
-- Each lead row expands to show a timeline: Email 1 -> Email 2 -> Call
-- Each step shows status (pending / sent / skipped) with sent date
-- **Bifurcation Actions** on each step (3 buttons):
-  - "No Response" -- sets `follow_up_date` to 3 days from now, keeps status pending
-  - "Replied" -- moves lead stage to `qualified`, creates a task "Call [company]" assigned to dispatcher, shows toast alert
-  - "Interested in Call" -- sets `response_status = 'interested_call'`, highlights lead green in all views
-- Button to "Start Sequence" for a lead (creates Email 1, Email 2, Call steps with staggered follow-up dates)
-
-**Tab 3: Template Library**
-- Grid of template cards grouped by Hub (Miami / Phoenix / LA tabs or filter)
-- Each card shows: template name, step type badge, subject line preview
-- Click to expand and see full body with a "Copy to Clipboard" button
-- Owners can add/edit/delete templates; dispatchers can only view and copy
-- "New Template" form: name, hub selector, step type (email_1, email_2, call_script), subject, body
-
----
-
-### Bifurcation Logic Detail
-
-When a dispatcher acts on a sequence step:
-
-| Response | Action |
+| Area | Details |
 |---|---|
-| No Response | Set `follow_up_date = today + 3 days`, keep `status = 'pending'` |
-| Replied | Update lead `stage = 'qualified'`, create task "Call [company] - they replied!", mark sequence step `status = 'completed'` |
-| Interested in Call | Set `response_status = 'interested_call'`, sequence step stays active, lead card gets green border everywhere |
-
----
-
-### Routing and Navigation
-
-- New route: `/nurture` in `App.tsx`
-- New sidebar item: "Nurture Engine" with `Zap` icon, added under "Operations" group in `AppSidebar.tsx`
+| Settings gear icon | Opens a dialog for owners to edit cadence settings |
+| Sequence Tracker header | Visual decision-tree diagram rendered with styled divs (not an image) |
+| Each sequence step | Shows matching template suggestion (hub + step_type match) with Copy button inline |
+| Bifurcation buttons | Each button opens a small popover with optional note field before confirming |
+| End-of-sequence | Shows "Restart Sequence" and "Mark Cold" buttons when all steps are completed/exhausted |
+| Cold leads section | Collapsible section at bottom of tracker for leads marked cold |
+| Progress bar | 3-segment bar on each lead card header |
 
 ---
 
@@ -80,20 +102,16 @@ When a dispatcher acts on a sequence step:
 
 | File | Change |
 |---|---|
-| `supabase/migrations/...` | Add `response_status` column to `lead_sequences` |
-| `src/pages/NurtureEngine.tsx` | New page with 3 tabs |
-| `src/App.tsx` | Add `/nurture` route |
-| `src/components/AppSidebar.tsx` | Add "Nurture Engine" nav item |
-| `src/pages/Pipeline.tsx` | Add green border for leads with `interested_call` status (query `lead_sequences` for the flag) |
+| `supabase/migrations/...` | Create `nurture_settings` table with RLS; add `note` column to `lead_sequences` |
+| `src/pages/NurtureEngine.tsx` | All UI enhancements: settings dialog, decision tree visual, template suggestions, note field on bifurcation, cold leads section, progress bar |
 
 ---
 
 ### Technical Notes
 
-- The `lead_sequences` table already supports `step_type` as free text; we'll use values like `email_1`, `email_2`, `call`
-- The `email_templates` table already has `hub` and `step_type` columns -- perfect fit
-- "Start Sequence" auto-creates 3 rows in `lead_sequences`: email_1 (today), email_2 (today+3), call (today+7)
-- The "Follow-Up Today" query uses `follow_up_date <= CURRENT_DATE` to catch overdue items too
-- Copy-to-clipboard uses the browser `navigator.clipboard.writeText()` API
-- Green highlight uses Tailwind `border-l-green-500` class conditionally
+- Template suggestion query: match `email_templates` where `hub = lead.city_hub` and `step_type = step.step_type`
+- "Mark Cold" sets a special `response_status = 'cold'` on the lead's last sequence step and is used to filter them into the cold section
+- Settings are fetched once on page load and cached in state; changes take effect immediately
+- The visual decision tree is built with Tailwind flexbox/grid, not a charting library
+- No changes to routing or sidebar needed -- everything is within the existing Nurture Engine page
 
