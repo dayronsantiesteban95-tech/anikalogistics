@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -25,6 +26,7 @@ import {
 import {
   Mail, Phone, Clock, ChevronDown, ChevronRight, Copy, Plus, Pencil, Trash2,
   Play, CheckCircle, PhoneCall, AlertCircle, Settings, RotateCcw, Snowflake, ArrowRight,
+  Calendar, Wrench, Hand,
 } from "lucide-react";
 import { format, differenceInDays, addDays } from "date-fns";
 
@@ -46,6 +48,7 @@ type SequenceStep = {
   sent_at: string | null;
   response_status: string;
   note: string | null;
+  manual_mode: boolean;
   created_at: string;
   leads?: LeadWithSequences;
 };
@@ -73,9 +76,9 @@ const DEFAULT_SETTINGS: NurtureSettings = {
 };
 
 const STEP_LABELS: Record<string, string> = {
-  email_1: "Email 1",
-  email_2: "Email 2",
-  call: "Call",
+  email_1: "Day 1 - Introduction",
+  email_2: "Day 4 - Social Proof",
+  call: "Day 8 - Low Friction Offer",
 };
 
 const STEP_ICONS: Record<string, React.ReactNode> = {
@@ -86,26 +89,34 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
 
 const HUBS = ["Miami", "Phoenix", "LA"];
 
+// ── Dynamic template variable replacement ──
+function replaceTemplateVars(text: string, lead?: LeadWithSequences | null): string {
+  if (!text || !lead) return text;
+  return text
+    .replace(/\[Name\]/gi, lead.contact_person || "")
+    .replace(/\[Company\]/gi, lead.company_name || "")
+    .replace(/\[City Hub\]/gi, lead.city_hub || "")
+    .replace(/\[Industry\]/gi, lead.industry || "");
+}
+
 // ── Visual Decision Tree ──
 function DecisionTree() {
   const steps = [
-    { key: "email_1", label: "Email 1", icon: <Mail className="h-4 w-4" /> },
-    { key: "email_2", label: "Email 2", icon: <Mail className="h-4 w-4" /> },
-    { key: "call", label: "Call", icon: <Phone className="h-4 w-4" /> },
+    { key: "email_1", label: "Day 1 - Intro", icon: <Mail className="h-4 w-4" /> },
+    { key: "email_2", label: "Day 4 - Proof", icon: <Mail className="h-4 w-4" /> },
+    { key: "call", label: "Day 8 - Offer", icon: <Phone className="h-4 w-4" /> },
   ];
   return (
     <Card className="mb-4">
       <CardContent className="p-4">
-        <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Decision Flow</p>
+        <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Anika Outreach Flow</p>
         <div className="flex items-start gap-0 overflow-x-auto">
           {steps.map((step, i) => (
             <div key={step.key} className="flex items-start">
-              {/* Step column */}
               <div className="flex flex-col items-center min-w-[100px]">
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-medium text-xs border border-primary/20">
                   {step.icon} {step.label}
                 </div>
-                {/* Branches */}
                 <div className="flex gap-4 mt-2">
                   <div className="flex flex-col items-center gap-1">
                     <div className="w-px h-3 bg-green-500" />
@@ -118,7 +129,6 @@ function DecisionTree() {
                   </div>
                 </div>
               </div>
-              {/* Arrow to next step */}
               {i < steps.length - 1 && (
                 <div className="flex flex-col items-center mt-2 mx-1">
                   <span className="text-[9px] text-muted-foreground mb-0.5">No Response</span>
@@ -133,18 +143,26 @@ function DecisionTree() {
   );
 }
 
-// ── Progress Bar (3 segments) ──
+// ── Progress Bar (3 segments) with label ──
 function SequenceProgressBar({ steps }: { steps: SequenceStep[] }) {
   const ordered = ["email_1", "email_2", "call"];
+  const sentCount = ordered.filter((st) => {
+    const s = steps.find((x) => x.step_type === st);
+    return s?.status === "completed";
+  }).length;
   return (
-    <div className="flex gap-0.5">
-      {ordered.map((st) => {
-        const s = steps.find((x) => x.step_type === st);
-        let color = "bg-muted";
-        if (s?.status === "completed") color = "bg-green-500";
-        else if (s?.status === "pending") color = "bg-primary";
-        return <div key={st} className={`h-1.5 w-6 rounded-full ${color}`} title={`${STEP_LABELS[st]}: ${s?.status || "not started"}`} />;
-      })}
+    <div className="flex items-center gap-1.5">
+      <div className="flex gap-0.5">
+        {ordered.map((st) => {
+          const s = steps.find((x) => x.step_type === st);
+          let color = "bg-muted";
+          if (s?.status === "completed") color = "bg-green-500";
+          else if (s?.status === "pending") color = "bg-primary";
+          else if (s?.status === "paused") color = "bg-amber-400";
+          return <div key={st} className={`h-1.5 w-6 rounded-full ${color}`} title={`${STEP_LABELS[st]}: ${s?.status || "not started"}`} />;
+        })}
+      </div>
+      <span className="text-[10px] text-muted-foreground font-medium">{sentCount}/3 sent</span>
     </div>
   );
 }
@@ -163,7 +181,7 @@ export default function NurtureEngine() {
   const [followUps, setFollowUps] = useState<SequenceStep[]>([]);
   const [followUpLeads, setFollowUpLeads] = useState<Record<string, LeadWithSequences>>({});
 
-  // Sequence Tracker
+  // Sequences (tracker)
   const [trackerLeads, setTrackerLeads] = useState<LeadWithSequences[]>([]);
   const [leadSequences, setLeadSequences] = useState<Record<string, SequenceStep[]>>({});
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
@@ -172,15 +190,16 @@ export default function NurtureEngine() {
   const [coldLeads, setColdLeads] = useState<{ lead: LeadWithSequences; steps: SequenceStep[] }[]>([]);
   const [showCold, setShowCold] = useState(false);
 
+  // Needs Attention
+  const [attentionSteps, setAttentionSteps] = useState<SequenceStep[]>([]);
+  const [attentionLeads, setAttentionLeads] = useState<Record<string, LeadWithSequences>>({});
+
   // Template Library
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [hubFilter, setHubFilter] = useState("all");
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [editTemplate, setEditTemplate] = useState<EmailTemplate | null>(null);
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
-
-  // Bifurcation note popover
-  const [noteText, setNoteText] = useState("");
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -238,6 +257,30 @@ export default function NurtureEngine() {
     }
   }, [today]);
 
+  // ── Fetch Needs Attention ──
+  const fetchAttention = useCallback(async () => {
+    const { data } = await supabase
+      .from("lead_sequences")
+      .select("*")
+      .in("response_status", ["replied", "interested_call"])
+      .neq("status", "completed")
+      .order("updated_at", { ascending: false });
+    if (!data) return;
+    setAttentionSteps(data as SequenceStep[]);
+    const leadIds = [...new Set(data.map((d: any) => d.lead_id))];
+    if (leadIds.length) {
+      const { data: leads } = await supabase
+        .from("leads")
+        .select("id, company_name, contact_person, city_hub, industry, stage")
+        .in("id", leadIds);
+      if (leads) {
+        const map: Record<string, LeadWithSequences> = {};
+        for (const l of leads) map[l.id] = l as LeadWithSequences;
+        setAttentionLeads(map);
+      }
+    }
+  }, []);
+
   // ── Fetch Sequence Tracker ──
   const fetchTracker = useCallback(async () => {
     const { data: leads } = await supabase
@@ -261,7 +304,6 @@ export default function NurtureEngine() {
           if (!map[s.lead_id]) map[s.lead_id] = [];
           map[s.lead_id].push(s);
         }
-        // Identify cold leads
         for (const lead of leads as LeadWithSequences[]) {
           const steps = map[lead.id] || [];
           if (steps.length > 0 && steps.some((s) => s.response_status === "cold")) {
@@ -288,7 +330,8 @@ export default function NurtureEngine() {
     fetchFollowUps();
     fetchTracker();
     fetchTemplates();
-  }, [fetchSettings, fetchFollowUps, fetchTracker, fetchTemplates]);
+    fetchAttention();
+  }, [fetchSettings, fetchFollowUps, fetchTracker, fetchTemplates, fetchAttention]);
 
   // ── Find matching template ──
   const findTemplate = (hub: string | null, stepType: string) => {
@@ -296,7 +339,28 @@ export default function NurtureEngine() {
     return templates.find((t) => t.hub.toLowerCase() === hub.toLowerCase() && t.step_type === stepType) || null;
   };
 
-  // ── Bifurcation Actions ──
+  // ── Manual Mode Toggle ──
+  const toggleManualMode = async (leadId: string, enable: boolean) => {
+    if (enable) {
+      // Pause all pending steps
+      await supabase
+        .from("lead_sequences")
+        .update({ manual_mode: true, status: "paused" })
+        .eq("lead_id", leadId)
+        .eq("status", "pending");
+    } else {
+      // Resume paused steps
+      await supabase
+        .from("lead_sequences")
+        .update({ manual_mode: false, status: "pending" })
+        .eq("lead_id", leadId)
+        .eq("status", "paused");
+    }
+    toast({ title: enable ? "Manual mode ON" : "Auto-pilot resumed" });
+    fetchTracker();
+  };
+
+  // ── Bifurcation Actions (original - for Sequences & Follow-Up) ──
   const handleNoResponse = async (step: SequenceStep, note?: string) => {
     const newDate = format(addDays(new Date(), settings.no_response_snooze_days), "yyyy-MM-dd");
     await supabase.from("lead_sequences").update({
@@ -328,6 +392,7 @@ export default function NurtureEngine() {
     toast({ title: "🎉 Lead Replied!", description: `${lead?.company_name} moved to Qualified.` });
     fetchFollowUps();
     fetchTracker();
+    fetchAttention();
   };
 
   const handleInterestedCall = async (step: SequenceStep, note?: string) => {
@@ -337,6 +402,56 @@ export default function NurtureEngine() {
     }).eq("id", step.id);
     toast({ title: "Interested in Call", description: "Lead highlighted for call scheduling." });
     fetchFollowUps();
+    fetchTracker();
+    fetchAttention();
+  };
+
+  // ── Needs Attention Bifurcation Actions (3 big buttons) ──
+  const handleScheduleCall = async (step: SequenceStep) => {
+    if (!user) return;
+    const lead = attentionLeads[step.lead_id];
+    // Move to negotiation
+    await supabase.from("leads").update({ stage: "negotiation" as any }).eq("id", step.lead_id);
+    // Mark sequence completed
+    await supabase.from("lead_sequences").update({ status: "completed" }).eq("lead_id", step.lead_id);
+    // Create task
+    await supabase.from("tasks").insert({
+      title: `Schedule call with ${lead?.company_name || "lead"}`,
+      status: "todo" as any,
+      priority: "high" as any,
+      department: "prospecting" as any,
+      created_by: user.id,
+    });
+    toast({ title: "📞 Call Scheduled", description: `${lead?.company_name} moved to Negotiation.` });
+    fetchAttention();
+    fetchTracker();
+  };
+
+  const handleNurture30d = async (step: SequenceStep) => {
+    const newDate = format(addDays(new Date(), 30), "yyyy-MM-dd");
+    await supabase.from("lead_sequences").update({
+      follow_up_date: newDate,
+      response_status: "nurture_30d",
+    }).eq("id", step.id);
+    toast({ title: "🔄 30-day nurture", description: "Lead will resurface in 30 days." });
+    fetchAttention();
+    fetchFollowUps();
+  };
+
+  const handleOperationalReview = async (step: SequenceStep) => {
+    if (!user) return;
+    const lead = attentionLeads[step.lead_id];
+    await supabase.from("leads").update({ stage: "operational_review" as any }).eq("id", step.lead_id);
+    await supabase.from("lead_sequences").update({ status: "completed" }).eq("lead_id", step.lead_id);
+    await supabase.from("tasks").insert({
+      title: `Pre-flight checklist: docks/white-glove for ${lead?.company_name || "lead"}`,
+      status: "todo" as any,
+      priority: "high" as any,
+      department: "operations" as any,
+      created_by: user.id,
+    });
+    toast({ title: "🔧 Operational Review", description: `${lead?.company_name} moved to Operational Review.` });
+    fetchAttention();
     fetchTracker();
   };
 
@@ -376,7 +491,6 @@ export default function NurtureEngine() {
   };
 
   const reviveLead = async (leadId: string) => {
-    // Remove cold status from all steps
     const steps = leadSequences[leadId] || [];
     for (const s of steps) {
       if (s.response_status === "cold") {
@@ -387,7 +501,7 @@ export default function NurtureEngine() {
     fetchTracker();
   };
 
-  // ── Start Sequence (uses settings) ──
+  // ── Start Sequence ──
   const startSequence = async (leadId: string) => {
     if (!user) return;
     const e2Days = settings.email1_to_email2_days;
@@ -446,6 +560,7 @@ export default function NurtureEngine() {
   const stepBadgeColor = (status: string) => {
     if (status === "completed") return "bg-green-500/10 text-green-600 border-green-500/30";
     if (status === "skipped") return "bg-muted text-muted-foreground";
+    if (status === "paused") return "bg-amber-500/10 text-amber-600 border-amber-500/30";
     return "bg-primary/10 text-primary border-primary/30";
   };
 
@@ -455,24 +570,29 @@ export default function NurtureEngine() {
   const activeColdIds = new Set(coldLeads.map((c) => c.lead.id));
   const activeTrackerLeads = trackerLeads.filter((l) => !activeColdIds.has(l.id));
 
-  // ── Bifurcation buttons with note popover ──
+  // Auto-pilot count
+  const autoPilotCount = activeTrackerLeads.filter((l) => {
+    const seqs = leadSequences[l.id] || [];
+    return seqs.length > 0 && !seqs.some((s) => s.manual_mode);
+  }).length;
+
+  // ── Bifurcation buttons with note popover (for Sequences & Follow-Up tabs) ──
   const BifurcationButtons = ({ step, lead }: { step: SequenceStep; lead?: LeadWithSequences }) => {
     const matchedTemplate = findTemplate(lead?.city_hub || null, step.step_type);
 
     return (
       <div className="space-y-2">
-        {/* Template suggestion */}
         {matchedTemplate && (
           <div className="flex items-center gap-2 p-2 rounded-md bg-accent/50 border border-accent">
             <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
             <span className="text-xs text-muted-foreground truncate flex-1">
-              {matchedTemplate.name}: <span className="italic">{matchedTemplate.subject}</span>
+              {matchedTemplate.name}: <span className="italic">{replaceTemplateVars(matchedTemplate.subject, lead)}</span>
             </span>
             <Button
               size="sm"
               variant="ghost"
               className="h-6 px-2 text-xs gap-1"
-              onClick={() => copyToClipboard(`Subject: ${matchedTemplate.subject}\n\n${matchedTemplate.body}`)}
+              onClick={() => copyToClipboard(`Subject: ${replaceTemplateVars(matchedTemplate.subject, lead)}\n\n${replaceTemplateVars(matchedTemplate.body, lead)}`)}
             >
               <Copy className="h-3 w-3" /> Copy
             </Button>
@@ -538,8 +658,8 @@ export default function NurtureEngine() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Nurture Engine</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage pre-qualification outreach sequences</p>
+          <h1 className="text-2xl font-bold tracking-tight">Anika Outreach Engine</h1>
+          <p className="text-muted-foreground text-sm mt-1">Automated outreach sequences & lead management</p>
         </div>
         {isOwner && (
           <Button variant="outline" size="icon" onClick={() => { setSettingsForm(settings); setShowSettings(true); }}>
@@ -548,70 +668,35 @@ export default function NurtureEngine() {
         )}
       </div>
 
-      <Tabs defaultValue="follow-up">
+      <Tabs defaultValue="sequences">
         <TabsList>
+          <TabsTrigger value="sequences" className="gap-1.5">
+            <Play className="h-3.5 w-3.5" /> Sequences
+          </TabsTrigger>
+          <TabsTrigger value="attention" className="gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5" /> Needs Attention
+            {attentionSteps.length > 0 && (
+              <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">{attentionSteps.length}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="follow-up" className="gap-1.5">
-            <AlertCircle className="h-3.5 w-3.5" /> Follow-Up Today
+            <Clock className="h-3.5 w-3.5" /> Follow-Up Today
             {followUps.length > 0 && (
               <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">{followUps.length}</Badge>
             )}
-          </TabsTrigger>
-          <TabsTrigger value="tracker" className="gap-1.5">
-            <Play className="h-3.5 w-3.5" /> Sequence Tracker
           </TabsTrigger>
           <TabsTrigger value="templates" className="gap-1.5">
             <Mail className="h-3.5 w-3.5" /> Template Library
           </TabsTrigger>
         </TabsList>
 
-        {/* ── TAB 1: Follow-Up Today ── */}
-        <TabsContent value="follow-up">
-          {followUps.length === 0 ? (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">
-              <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-500" />
-              <p className="font-medium">All caught up!</p>
-              <p className="text-sm">No follow-ups due today.</p>
-            </CardContent></Card>
-          ) : (
-            <div className="space-y-2">
-              {followUps.map((step) => {
-                const lead = followUpLeads[step.lead_id];
-                const overdue = daysOverdue(step.follow_up_date);
-                const isInterested = step.response_status === "interested_call";
-                return (
-                  <Card key={step.id} className={`transition-all ${isInterested ? "border-l-4 border-l-green-500" : ""}`}>
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${stepBadgeColor(step.status)}`}>
-                            {STEP_ICONS[step.step_type] || <Mail className="h-3.5 w-3.5" />}
-                          </div>
-                          <div>
-                            <p className="font-semibold text-sm">{lead?.company_name || "Unknown Lead"}</p>
-                            <p className="text-xs text-muted-foreground">{lead?.contact_person} · {lead?.city_hub || "No Hub"}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">{STEP_LABELS[step.step_type] || step.step_type}</Badge>
-                          {overdue > 0 && (
-                            <Badge variant="destructive" className="text-xs">{overdue}d overdue</Badge>
-                          )}
-                          {isInterested && (
-                            <Badge className="bg-green-500 text-white text-xs">🟢 Wants Call</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <BifurcationButtons step={step} lead={lead} />
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* ── TAB 2: Sequence Tracker ── */}
-        <TabsContent value="tracker">
+        {/* ── TAB 1: Sequences (Auto-Pilot) ── */}
+        <TabsContent value="sequences">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-muted-foreground font-medium">
+              {autoPilotCount} lead{autoPilotCount !== 1 ? "s" : ""} in Auto-Pilot
+            </p>
+          </div>
           <DecisionTree />
           {activeTrackerLeads.length === 0 && coldLeads.length === 0 ? (
             <Card><CardContent className="p-8 text-center text-muted-foreground">
@@ -625,6 +710,7 @@ export default function NurtureEngine() {
                 const hasSequence = seqs.length > 0;
                 const isInterested = seqs.some((s) => s.response_status === "interested_call");
                 const exhausted = isSequenceExhausted(seqs);
+                const isManual = seqs.some((s) => s.manual_mode);
                 return (
                   <Collapsible key={lead.id} open={expandedLead === lead.id} onOpenChange={(open) => setExpandedLead(open ? lead.id : null)}>
                     <Card className={`transition-all ${isInterested ? "border-l-4 border-l-green-500" : ""}`}>
@@ -637,10 +723,26 @@ export default function NurtureEngine() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {hasSequence ? (
-                              <SequenceProgressBar steps={seqs} />
-                            ) : (
+                            {hasSequence && (
+                              isManual ? (
+                                <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/30 text-[10px]">
+                                  <Hand className="h-3 w-3 mr-1" /> Manual
+                                </Badge>
+                              ) : (
+                                <SequenceProgressBar steps={seqs} />
+                              )
+                            )}
+                            {!hasSequence && (
                               <Badge variant="outline" className="text-xs text-muted-foreground">No sequence</Badge>
+                            )}
+                            {hasSequence && (
+                              <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+                                <Switch
+                                  checked={isManual}
+                                  onCheckedChange={(checked) => toggleManualMode(lead.id, checked)}
+                                  className="scale-75"
+                                />
+                              </div>
                             )}
                             <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
                           </div>
@@ -678,7 +780,6 @@ export default function NurtureEngine() {
                                   </div>
                                 </div>
                               ))}
-                              {/* End-of-sequence actions */}
                               {exhausted && (
                                 <div className="flex gap-2 pt-2 border-t">
                                   <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => restartSequence(lead.id)}>
@@ -737,7 +838,119 @@ export default function NurtureEngine() {
           )}
         </TabsContent>
 
-        {/* ── TAB 3: Template Library ── */}
+        {/* ── TAB 2: Needs Attention ── */}
+        <TabsContent value="attention">
+          {attentionSteps.length === 0 ? (
+            <Card><CardContent className="p-8 text-center text-muted-foreground">
+              <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-500" />
+              <p className="font-medium">No leads need attention</p>
+              <p className="text-sm">All replied leads have been actioned.</p>
+            </CardContent></Card>
+          ) : (
+            <div className="space-y-3">
+              {attentionSteps.map((step) => {
+                const lead = attentionLeads[step.lead_id];
+                return (
+                  <Card key={step.id} className="border-l-4 border-l-amber-500">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-sm">{lead?.company_name || "Unknown"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {lead?.contact_person} · {lead?.city_hub || "No Hub"} · {lead?.industry || "N/A"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">{STEP_LABELS[step.step_type] || step.step_type}</Badge>
+                          <Badge className={step.response_status === "replied" ? "bg-green-500 text-white text-xs" : "bg-emerald-500 text-white text-xs"}>
+                            {step.response_status === "replied" ? "Replied" : "Wants Call"}
+                          </Badge>
+                        </div>
+                      </div>
+                      {step.note && (
+                        <p className="text-xs text-muted-foreground italic">📝 {step.note}</p>
+                      )}
+                      {/* 3 Big Action Buttons */}
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          className="gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => handleScheduleCall(step)}
+                        >
+                          <Calendar className="h-3.5 w-3.5" /> Interested - Schedule Call
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-xs border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
+                          onClick={() => handleNurture30d(step)}
+                        >
+                          <Clock className="h-3.5 w-3.5" /> Not Now - Nurture
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-xs border-blue-500/50 text-blue-600 hover:bg-blue-500/10"
+                          onClick={() => handleOperationalReview(step)}
+                        >
+                          <Wrench className="h-3.5 w-3.5" /> Operational Review
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── TAB 3: Follow-Up Today ── */}
+        <TabsContent value="follow-up">
+          {followUps.length === 0 ? (
+            <Card><CardContent className="p-8 text-center text-muted-foreground">
+              <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-500" />
+              <p className="font-medium">All caught up!</p>
+              <p className="text-sm">No follow-ups due today.</p>
+            </CardContent></Card>
+          ) : (
+            <div className="space-y-2">
+              {followUps.map((step) => {
+                const lead = followUpLeads[step.lead_id];
+                const overdue = daysOverdue(step.follow_up_date);
+                const isInterested = step.response_status === "interested_call";
+                return (
+                  <Card key={step.id} className={`transition-all ${isInterested ? "border-l-4 border-l-green-500" : ""}`}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${stepBadgeColor(step.status)}`}>
+                            {STEP_ICONS[step.step_type] || <Mail className="h-3.5 w-3.5" />}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">{lead?.company_name || "Unknown Lead"}</p>
+                            <p className="text-xs text-muted-foreground">{lead?.contact_person} · {lead?.city_hub || "No Hub"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">{STEP_LABELS[step.step_type] || step.step_type}</Badge>
+                          {overdue > 0 && (
+                            <Badge variant="destructive" className="text-xs">{overdue}d overdue</Badge>
+                          )}
+                          {isInterested && (
+                            <Badge className="bg-green-500 text-white text-xs">🟢 Wants Call</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <BifurcationButtons step={step} lead={lead} />
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── TAB 4: Template Library ── */}
         <TabsContent value="templates">
           <div className="flex items-center justify-between mb-4">
             <div className="flex gap-1">
@@ -752,6 +965,9 @@ export default function NurtureEngine() {
               </Button>
             )}
           </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Use <code className="bg-muted px-1 rounded">[Name]</code>, <code className="bg-muted px-1 rounded">[Company]</code>, <code className="bg-muted px-1 rounded">[City Hub]</code>, <code className="bg-muted px-1 rounded">[Industry]</code> as dynamic variables.
+          </p>
 
           {filteredTemplates.length === 0 ? (
             <Card><CardContent className="p-8 text-center text-muted-foreground">
@@ -809,7 +1025,7 @@ export default function NurtureEngine() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editTemplate ? "Edit Template" : "New Template"}</DialogTitle>
-            <DialogDescription>Create email templates for your dispatchers.</DialogDescription>
+            <DialogDescription>Create email templates for your dispatchers. Use [Name], [Company], [City Hub], [Industry] as variables.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleTemplateSave} className="space-y-3">
             <div>
@@ -831,9 +1047,9 @@ export default function NurtureEngine() {
                 <Select name="step_type" defaultValue={editTemplate?.step_type ?? "email_1"}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="email_1">Email 1</SelectItem>
-                    <SelectItem value="email_2">Email 2</SelectItem>
-                    <SelectItem value="call_script">Call Script</SelectItem>
+                    <SelectItem value="email_1">Day 1 - Introduction</SelectItem>
+                    <SelectItem value="email_2">Day 4 - Social Proof</SelectItem>
+                    <SelectItem value="call">Day 8 - Low Friction Offer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -862,11 +1078,11 @@ export default function NurtureEngine() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label className="text-xs">Days: Email 1 → Email 2</Label>
+              <Label className="text-xs">Days: Day 1 → Day 4 (Introduction → Social Proof)</Label>
               <Input type="number" min={1} max={30} value={settingsForm.email1_to_email2_days} onChange={(e) => setSettingsForm((p) => ({ ...p, email1_to_email2_days: parseInt(e.target.value) || 3 }))} />
             </div>
             <div>
-              <Label className="text-xs">Days: Email 2 → Call</Label>
+              <Label className="text-xs">Days: Day 4 → Day 8 (Social Proof → Low Friction Offer)</Label>
               <Input type="number" min={1} max={30} value={settingsForm.email2_to_call_days} onChange={(e) => setSettingsForm((p) => ({ ...p, email2_to_call_days: parseInt(e.target.value) || 4 }))} />
             </div>
             <div>
