@@ -131,6 +131,32 @@ export default function TaskBoard() {
     return map[p] || "bg-muted";
   };
 
+  const statusColumnStyle = (s: string) => {
+    const map: Record<string, string> = {
+      todo: "bg-muted/50 border-t-4 border-t-yellow-400",
+      in_progress: "bg-muted/50 border-t-4 border-t-blue-500",
+      done: "bg-muted/50 border-t-4 border-t-green-500",
+    };
+    return map[s] || "bg-muted/50";
+  };
+
+  const statusCardBorder = (s: string) => {
+    const map: Record<string, string> = {
+      todo: "hsl(45, 93%, 55%)",
+      in_progress: "hsl(213, 94%, 55%)",
+      done: "hsl(142, 71%, 45%)",
+    };
+    return map[s] || "hsl(213, 20%, 88%)";
+  };
+
+  const dueDateColor = (date: string | null) => {
+    if (!date) return "text-muted-foreground";
+    const today = new Date().toISOString().split("T")[0];
+    if (date < today) return "text-red-500 font-semibold";
+    if (date === today) return "text-amber-500 font-semibold";
+    return "text-muted-foreground";
+  };
+
   const getAssigneeName = (userId: string | null) => {
     if (!userId) return null;
     return profiles.find((p) => p.user_id === userId)?.full_name ?? "Unknown";
@@ -191,7 +217,7 @@ export default function TaskBoard() {
         {TASK_STATUSES.map((status) => (
           <div
             key={status.value}
-            className="bg-muted/50 rounded-xl p-3 flex flex-col"
+            className={`rounded-xl p-3 flex flex-col ${statusColumnStyle(status.value)}`}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(status.value)}
           >
@@ -208,7 +234,7 @@ export default function TaskBoard() {
                   <Card
                     key={task.id}
                     className="group cursor-pointer hover:shadow-md transition-all duration-200 border-l-4"
-                    style={{ borderLeftColor: task.department ? "hsl(30, 100%, 50%)" : "hsl(213, 20%, 88%)" }}
+                    style={{ borderLeftColor: statusCardBorder(task.status) }}
                     draggable
                     onDragStart={() => setDraggedId(task.id)}
                   >
@@ -237,7 +263,7 @@ export default function TaskBoard() {
                           </Badge>
                         )}
                         {task.due_date && (
-                          <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {task.due_date}</span>
+                          <span className={`flex items-center gap-1 ${dueDateColor(task.due_date)}`}><Calendar className="h-3 w-3" /> {task.due_date}</span>
                         )}
                         {task.assigned_to && (
                           <span className="flex items-center gap-1"><User className="h-3 w-3" /> {getAssigneeName(task.assigned_to)}</span>
