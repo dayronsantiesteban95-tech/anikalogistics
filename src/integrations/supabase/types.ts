@@ -464,6 +464,11 @@ export type Database = {
         | "quote_sent"
         | "negotiation"
         | "account_won"
+        | "qualified"
+        | "operational_review"
+        | "trial_run"
+        | "account_active"
+        | "retention"
       task_priority: "critical" | "high" | "medium" | "low"
       task_status: "todo" | "in_progress" | "done"
     }
@@ -610,6 +615,11 @@ export const Constants = {
         "quote_sent",
         "negotiation",
         "account_won",
+        "qualified",
+        "operational_review",
+        "trial_run",
+        "account_active",
+        "retention",
       ],
       task_priority: ["critical", "high", "medium", "low"],
       task_status: ["todo", "in_progress", "done"],
