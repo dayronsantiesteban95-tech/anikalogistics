@@ -1,141 +1,79 @@
 
 
-# UI Overhaul & Lead Form Redesign
+# Security Hardening Plan
 
 ## Overview
-Modernize the entire Anika Logistics CRM with the official logo, polished Cortana-inspired design, last-mile delivery metrics in the lead form, an interactive calendar date picker, and thorough end-to-end testing.
+Fix critical security vulnerabilities: add JWT validation to the AI chat function, tighten RLS policies across all tables using role-based access, and enable leaked password protection.
 
 ---
 
-## 1. Add Official Logos to the Project
+## 1. Fix AI Chat Edge Function (Critical)
 
-Copy the uploaded logo files into `src/assets/`:
-- `logo-azul.png` -- blue logo for header (light mode)
-- `logo-blanco.png` -- white logo for sidebar (dark background)
-- `perfil-logo-azul.jpg` -- square avatar for favicon/branding
+**File:** `supabase/functions/ai-chat/index.ts`
 
-Update **GlobalHeader.tsx**: Replace the Truck icon + text with an `<img>` tag using the blue logo (`logo-azul.png`), sized to ~160px width.
-
-Update **AppSidebar.tsx**: Add the white logo (`logo-blanco.png`) at the top of the sidebar content area, sized appropriately for the sidebar width.
+- Add JWT validation using `getClaims()` before processing any request
+- Use the authenticated user's client (with anon key + auth header) instead of the service role key for data queries, so RLS policies are respected
+- Return 401 for unauthenticated requests
 
 ---
 
-## 2. Cortana-Inspired UI Polish
+## 2. Tighten RLS Policies (Critical)
 
-### Global Header
-- Clean, minimal header with logo on the left and timezone clocks on the right
-- Add subtle bottom shadow instead of hard border
-- Slightly taller (h-16) for breathing room
+Replace all `USING (true)` UPDATE/DELETE policies with ownership or role-based checks. The approach uses the existing `has_role()` function and `created_by` columns.
 
-### Sidebar
-- Add the white logo at the top with padding
-- Increase spacing between nav groups
-- Rounded pill-style active state with the orange accent
-- Smoother hover transitions
-- Add a subtle separator line between groups
+### Policy Strategy
 
-### Dashboard (Cortana-inspired stat cards)
-- Each stat card gets a small sparkline/trend icon on the right (already has icons, enhance with subtle gradient backgrounds)
-- Add "vs last month" style micro-text beneath numbers (placeholder for now)
-- Rounded-2xl cards with slightly larger padding
-- Subtle hover scale effect on cards
+Since this is a team CRM where collaboration is needed, the approach will be:
+- **SELECT**: Keep `USING (true)` for most tables (team needs shared visibility)
+- **INSERT**: Keep `auth.uid() = created_by` (already correct)
+- **UPDATE**: Allow creator OR owner role: `(auth.uid() = created_by) OR has_role(auth.uid(), 'owner')`
+- **DELETE**: Allow creator OR owner role: `(auth.uid() = created_by) OR has_role(auth.uid(), 'owner')`
 
-### Pipeline Kanban
-- Wider column headers with colored top-border per stage (using a gradient from navy to orange across stages)
-- Smoother card hover with translateY(-2px) lift effect
-- Better spacing and rounded corners on kanban columns
-- Stage header badges with colored dots instead of plain numbers
+### Tables to Update
 
----
+| Table | UPDATE Policy | DELETE Policy |
+|-------|--------------|---------------|
+| companies | creator OR owner | creator OR owner |
+| contacts | creator OR owner | creator OR owner |
+| leads | creator OR owner | creator OR owner |
+| lead_interactions | creator OR owner | creator OR owner |
+| lead_sequences | creator OR owner | creator OR owner |
+| email_templates | creator OR owner | creator OR owner |
+| sop_articles | creator OR owner | creator OR owner |
+| tasks | creator OR assigned_to OR owner | creator OR owner |
+| task_lead_links | owner only | owner only |
 
-## 3. Redesign "New Lead" Form for Last-Mile Delivery
+### Migration SQL (single migration)
 
-### Remove
-- "Main Lanes" field (not relevant to last-mile)
-
-### Replace/Add Last-Mile Specific Fields
-- **Service Type** (select): Last Mile, Courier, White-Glove, 6-Hour Hotshot
-- **Avg. Packages/Day** (number): estimated daily package volume
-- **Delivery Radius (miles)** (number): typical delivery radius
-- **Vehicle Type Required** (select): Cargo Van, Sprinter, Box Truck, Car/SUV
-- **SLA Requirement** (text): e.g. "Same-day by 5pm", "Next-day"
-
-### Keep existing fields
-- Company Name, Contact Person, Phone, Email
-- Est. Monthly Loads, City Hub, Industry
-- Next Action Date (will become interactive calendar)
-- Delivery Points
-
-### Form Layout
-- Organized into sections with subtle dividers:
-  - "Contact Information" (company, person, phone, email)
-  - "Delivery Metrics" (service type, packages/day, radius, vehicle, SLA, monthly loads)
-  - "Location & Scheduling" (city hub, industry, delivery points, next action date)
+For each table, the migration will:
+1. DROP the existing permissive UPDATE/DELETE policies
+2. CREATE new policies with proper ownership + role checks
+3. Make `created_by` columns NOT NULL with DEFAULT `auth.uid()` where safe
 
 ---
 
-## 4. Interactive Calendar for Next Action Date
+## 3. Enable Leaked Password Protection
 
-Replace the plain `<Input type="date">` with the Shadcn **DatePicker** component (Popover + Calendar):
-- Button trigger showing the selected date in a readable format (e.g. "Feb 15, 2026")
-- Calendar popup with `pointer-events-auto` class for dialog compatibility
-- Disable past dates for next action scheduling
-- Show a placeholder "Pick a date" when empty
+Use the configure-auth tool to enable leaked password protection, which checks passwords against known breach databases during signup and login.
 
 ---
 
-## 5. Database Migration
+## 4. Make `created_by` Columns NOT NULL
 
-Add new columns to the `leads` table:
-- `service_type` (text, nullable) -- values: last_mile, courier, white_glove, hotshot
-- `avg_packages_day` (integer, nullable)
-- `delivery_radius_miles` (integer, nullable)
-- `vehicle_type` (text, nullable)
-- `sla_requirement` (text, nullable)
-
-The `main_lanes` column will be kept in the database for backward compatibility but removed from the UI form.
-
----
-
-## 6. Constants Update
-
-Add to `src/lib/constants.ts`:
-- `SERVICE_TYPES` array: Last Mile, Courier, White-Glove, 6-Hour Hotshot
-- `VEHICLE_TYPES` array: Cargo Van, Sprinter, Box Truck, Car/SUV
-
----
-
-## 7. End-to-End Testing Plan
-
-After implementation, manually verify:
-1. Logo displays correctly in header and sidebar (both light and dark mode)
-2. Create a new lead using the redesigned form -- verify all new fields save correctly
-3. Test the interactive calendar date picker opens, selects dates, and saves
-4. Edit an existing lead -- verify pre-populated values
-5. Drag-and-drop a lead between pipeline stages
-6. Verify dark mode toggle still works with new logo variants
-7. Check mobile responsiveness of the redesigned form and pipeline
+For tables where `created_by` is nullable, alter them to have a default of `auth.uid()` and set NOT NULL (after backfilling any existing NULL values with a placeholder or the first owner user).
 
 ---
 
 ## Technical Details
 
-### Files to Create
-- `src/assets/logo-azul.png` (copy from uploads)
-- `src/assets/logo-blanco.png` (copy from uploads)
-
 ### Files to Modify
-- `src/components/GlobalHeader.tsx` -- logo image, styling
-- `src/components/AppSidebar.tsx` -- sidebar logo, spacing, polish
-- `src/pages/Pipeline.tsx` -- lead form redesign, interactive calendar, card polish, new fields
-- `src/pages/Dashboard.tsx` -- card styling enhancements
-- `src/lib/constants.ts` -- SERVICE_TYPES, VEHICLE_TYPES
-- `src/index.css` -- minor utility class additions for hover effects
+- `supabase/functions/ai-chat/index.ts` -- add JWT validation, switch from service role key to user-scoped client
 
 ### Database Migration
-- ALTER TABLE leads ADD COLUMN service_type text;
-- ALTER TABLE leads ADD COLUMN avg_packages_day integer;
-- ALTER TABLE leads ADD COLUMN delivery_radius_miles integer;
-- ALTER TABLE leads ADD COLUMN vehicle_type text;
-- ALTER TABLE leads ADD COLUMN sla_requirement text;
+Single migration covering:
+- ~18 policy DROP + CREATE statements across 9 tables
+- ALTER COLUMN statements for `created_by` defaults
+
+### No Frontend Changes Required
+All fixes are backend-only. The frontend already sends the auth token in requests.
 
