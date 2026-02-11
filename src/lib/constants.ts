@@ -65,6 +65,20 @@ export const INDUSTRIES = [
   { value: "ecommerce_last_mile", label: "E-commerce/Last-Mile", color: "bg-emerald-500" },
 ] as const;
 
+export const SERVICE_TYPES = [
+  { value: "last_mile", label: "Last Mile" },
+  { value: "courier", label: "Courier" },
+  { value: "white_glove", label: "White-Glove" },
+  { value: "hotshot", label: "6-Hour Hotshot" },
+] as const;
+
+export const VEHICLE_TYPES = [
+  { value: "cargo_van", label: "Cargo Van" },
+  { value: "sprinter", label: "Sprinter" },
+  { value: "box_truck", label: "Box Truck" },
+  { value: "car_suv", label: "Car/SUV" },
+] as const;
+
 export const SOP_CATEGORIES = [
   { value: "general", label: "General" },
   { value: "last_mile", label: "Last-Mile" },

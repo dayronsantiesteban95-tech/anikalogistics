@@ -27,6 +27,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import logoBlanco from "@/assets/logo-blanco.png";
 
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -54,7 +56,6 @@ export function AppSidebar() {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
-  // Poll for replied leads every 60 seconds
   const fetchReplyCount = useCallback(async () => {
     const { count } = await supabase
       .from("lead_sequences")
@@ -81,13 +82,13 @@ export function AppSidebar() {
         <NavLink
           to={item.url}
           end={item.url === "/dashboard"}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200"
-          activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-full text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300"
+          activeClassName="bg-sidebar-primary/20 text-sidebar-primary font-semibold shadow-sm"
         >
           <div className="relative">
             <item.icon className="h-4 w-4" />
             {item.url === "/nurture" && replyCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-orange-500" />
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-accent" />
             )}
           </div>
           <span className="text-sm">{item.title}</span>
@@ -98,35 +99,45 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="glass-panel border-r-0">
-      <SidebarContent className="pt-4">
+      <SidebarContent className="pt-5">
+        {/* Logo */}
+        <div className="px-5 pb-4">
+          <img src={logoBlanco} alt="Anika Logistics" className="h-8 w-auto object-contain" />
+        </div>
+        <Separator className="bg-sidebar-border/50 mb-2" />
+
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/60 uppercase text-[10px] tracking-[0.15em] font-semibold mb-2">
+          <SidebarGroupLabel className="text-sidebar-foreground/50 uppercase text-[10px] tracking-[0.18em] font-semibold mb-2 px-3">
             Operations
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-0.5">
               {mainNav.map((item) => <NavItem key={item.title} item={item} />)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <Separator className="bg-sidebar-border/30 my-2 mx-3" />
+
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/60 uppercase text-[10px] tracking-[0.15em] font-semibold mb-2">
+          <SidebarGroupLabel className="text-sidebar-foreground/50 uppercase text-[10px] tracking-[0.18em] font-semibold mb-2 px-3">
             CRM
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-0.5">
               {crmNav.map((item) => <NavItem key={item.title} item={item} />)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <Separator className="bg-sidebar-border/30 my-2 mx-3" />
+
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/60 uppercase text-[10px] tracking-[0.15em] font-semibold mb-2">
+          <SidebarGroupLabel className="text-sidebar-foreground/50 uppercase text-[10px] tracking-[0.18em] font-semibold mb-2 px-3">
             Resources
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-0.5">
               {resourcesNav.map((item) => <NavItem key={item.title} item={item} />)}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -136,7 +147,7 @@ export function AppSidebar() {
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start gap-3 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+          className="w-full justify-start gap-3 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-full transition-all duration-300"
           onClick={() => setDark(!dark)}
         >
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -145,7 +156,7 @@ export function AppSidebar() {
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start gap-3 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+          className="w-full justify-start gap-3 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-full transition-all duration-300"
           onClick={handleLogout}
         >
           <LogOut className="h-4 w-4" />
