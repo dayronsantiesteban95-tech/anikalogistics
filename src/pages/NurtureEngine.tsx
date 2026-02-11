@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getAnikaTemplates } from "@/lib/anikaTemplates";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
@@ -88,8 +89,8 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
   call: <Phone className="h-3.5 w-3.5" />,
 };
 
-const HUBS = ["miami", "phoenix", "la"];
-const HUB_LABELS: Record<string, string> = { miami: "Miami", phoenix: "Phoenix", la: "LA" };
+const HUBS = ["atlanta", "phoenix", "la"];
+const HUB_LABELS: Record<string, string> = { atlanta: "Atlanta", phoenix: "Phoenix", la: "LA" };
 
 // ── Dynamic template variable replacement ──
 function replaceTemplateVars(text: string, lead?: LeadWithSequences | null): string {
@@ -582,6 +583,28 @@ export default function NurtureEngine() {
 
   // ── Send Email via Edge Function ──
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+  const [seedingTemplates, setSeedingTemplates] = useState(false);
+
+  const seedAnikaTemplates = async () => {
+    if (!user) return;
+    setSeedingTemplates(true);
+    try {
+      const allTemplates = getAnikaTemplates();
+      const rows = allTemplates.map((t) => ({ ...t, created_by: user.id }));
+      // Insert in batches of 15
+      for (let i = 0; i < rows.length; i += 15) {
+        const batch = rows.slice(i, i + 15);
+        const { error } = await supabase.from("email_templates").insert(batch);
+        if (error) throw error;
+      }
+      toast({ title: "✅ 45 Anika templates loaded!", description: "15 templates × 3 hubs. Ready to use." });
+      fetchTemplates();
+    } catch (err: any) {
+      toast({ title: "Failed to seed templates", description: err.message, variant: "destructive" });
+    } finally {
+      setSeedingTemplates(false);
+    }
+  };
 
   const sendOutreachEmail = async (step: SequenceStep, lead: LeadWithSequences, template: EmailTemplate) => {
     if (!lead.email) {
@@ -1033,9 +1056,17 @@ export default function NurtureEngine() {
                 <Button key={h} variant={hubFilter === h ? "default" : "outline"} size="sm" onClick={() => setHubFilter(h)}>{HUB_LABELS[h] || h}</Button>
               ))}
             </div>
-            <Button size="sm" onClick={() => { setEditTemplate(null); setShowTemplateForm(true); }} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> New Template
-            </Button>
+            <div className="flex gap-2">
+              {templates.length === 0 && (
+                <Button size="sm" variant="outline" onClick={seedAnikaTemplates} disabled={seedingTemplates} className="gap-1.5">
+                  {seedingTemplates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  {seedingTemplates ? "Loading..." : "Load Anika Templates"}
+                </Button>
+              )}
+              <Button size="sm" onClick={() => { setEditTemplate(null); setShowTemplateForm(true); }} className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> New Template
+              </Button>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
             Use <code className="bg-muted px-1 rounded">[Name]</code>, <code className="bg-muted px-1 rounded">[Company]</code>, <code className="bg-muted px-1 rounded">[City Hub]</code>, <code className="bg-muted px-1 rounded">[Industry]</code> as dynamic variables.
@@ -1103,7 +1134,7 @@ export default function NurtureEngine() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Hub</Label>
-                <Select name="hub" defaultValue={editTemplate?.hub ?? "miami"}>
+                <Select name="hub" defaultValue={editTemplate?.hub ?? "atlanta"}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {HUBS.map((h) => <SelectItem key={h} value={h}>{HUB_LABELS[h] || h}</SelectItem>)}

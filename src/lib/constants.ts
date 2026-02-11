@@ -47,13 +47,13 @@ export const ACTIVITY_TYPES = [
 ] as const;
 
 export const TIMEZONES = [
-  { city: "Miami", timezone: "America/New_York", abbr: "EST" },
+  { city: "Atlanta", timezone: "America/New_York", abbr: "EST" },
   { city: "Phoenix", timezone: "America/Phoenix", abbr: "MST" },
   { city: "Los Angeles", timezone: "America/Los_Angeles", abbr: "PST" },
 ] as const;
 
 export const CITY_HUBS = [
-  { value: "miami", label: "Miami" },
+  { value: "atlanta", label: "Atlanta" },
   { value: "phoenix", label: "Phoenix" },
   { value: "la", label: "Los Angeles" },
 ] as const;
@@ -88,7 +88,7 @@ export const SOP_CATEGORIES = [
 
 // Cities within ~300 miles of each hub for radius validation
 export const ACTION_ZONE_CITIES: Record<string, string[]> = {
-  miami: ["miami", "fort lauderdale", "west palm beach", "orlando", "tampa", "naples", "key west", "jacksonville", "gainesville", "tallahassee", "sarasota", "st petersburg", "cape coral", "port st lucie", "daytona"],
+  atlanta: ["atlanta", "marietta", "decatur", "savannah", "augusta", "macon", "athens", "alpharetta", "roswell", "sandy springs", "kennesaw", "duluth", "lawrenceville", "columbus", "chattanooga"],
   phoenix: ["phoenix", "scottsdale", "tucson", "mesa", "tempe", "chandler", "flagstaff", "sedona", "yuma", "prescott", "las vegas", "henderson", "albuquerque"],
   la: ["los angeles", "long beach", "anaheim", "santa ana", "riverside", "san bernardino", "ontario", "pasadena", "san diego", "bakersfield", "santa barbara", "palm springs", "ventura", "oxnard", "irvine"],
 };
