@@ -1,103 +1,114 @@
 
 
-# SOP Wiki + Nurture Engine Access + QA Review
+# Functional Logic, UX, and Edge Case Hardening
 
 ## Overview
-Three changes: (1) make SOP Wiki fully editable by all users (owners and dispatchers), (2) make Nurture Engine accessible to everyone, and (3) fix any spelling/spacing issues across the app. Plus, recommendations for final touches.
+This plan addresses six areas: fixing the CRM-to-Task data link, adding automation safety (stop switch), improving empty states, adding form validation with error messages, and adding skeleton loading states. The "Total Pipeline Value" item is noted as not applicable since the database has no estimated value field on leads.
 
 ---
 
-## 1. Make SOP Wiki Editable by Everyone
+## 1. CRM to Task Sync Fix (Race Condition)
 
-**File:** `src/pages/SopWiki.tsx`
+**File:** `src/pages/TaskBoard.tsx`
 
-Currently, all create/edit/delete buttons are gated behind `isOwner`. We need to remove those guards so any authenticated user can:
-- Create new articles (the "New Article" button)
-- Edit articles (pencil icon in both cheatsheet and grid views)
-- Delete articles (trash icon, with confirmation)
+**Problem:** When creating a task linked to a lead, the code inserts the task and then queries for the "most recent task" to get its ID. This is a race condition -- two simultaneous creates could link the wrong task.
+
+**Fix:**
+- Change the insert call to use `.select("id").single()` which returns the newly created row's ID directly
+- Use that ID to insert into `task_lead_links`
+- Show the linked lead name on task cards by fetching `task_lead_links` and joining with leads
 
 **Changes:**
-- Remove all `{isOwner && (...)}` wrappers around the "New Article" button (line 123), edit/delete buttons in cheatsheet view (line 187), grid view hover actions (line 217), and the view dialog edit/delete buttons (line 273)
-- The `useUserRole` import can be removed since it's no longer needed
-- RLS already allows any authenticated user to INSERT and allows creators OR owners to UPDATE/DELETE -- this is appropriate (users can edit/delete their own articles, owners can edit/delete any)
+- Refactor `handleSubmit` to capture the inserted task ID from the insert response
+- Fetch `task_lead_links` alongside tasks and display a small badge on linked task cards showing the lead company name
 
 ---
 
-## 2. Make Nurture Engine Visible and Usable by Everyone
+## 2. Pipeline Value -- Not Applicable
 
-The sidebar already includes Nurture Engine in `mainNav` for all users, so it's already accessible. However, inside the Nurture Engine page, some features are owner-gated:
-- **Settings button** (line 728): Keep owner-only -- cadence settings are admin-level
-- **Template creation** (line 1026): Make available to everyone
-- **Template edit/delete** (line 1066): Make available to everyone
+The leads table has `estimated_monthly_loads` but no monetary `estimated_value` column. The Dashboard does not show a "Total Pipeline Value" stat, so there is no dummy data to replace. If you want a pipeline value metric in the future, a new column would need to be added to leads.
+
+---
+
+## 3. Automation Safety -- Stop Switch
 
 **File:** `src/pages/NurtureEngine.tsx`
-- Remove `isOwner` guard from "New Template" button
-- Remove `isOwner` guard from template edit/delete actions
-- Update the empty-state text that says "Your team lead hasn't added templates yet" to a generic message
-- Keep settings (cadence days) as owner-only since those are admin-level configurations
+
+**Problem:** When a lead replies or shows interest (handleReplied, handleInterestedCall), only the clicked step is marked "completed." Other pending/paused steps for the same lead remain active and will surface in Follow-Up Today.
+
+**Fix:** In both `handleReplied` and `handleInterestedCall`, after marking the current step as completed, also mark ALL other pending/paused steps for the same lead as "completed" with response_status "stopped":
+
+```sql
+UPDATE lead_sequences 
+SET status = 'completed', response_status = 'stopped'
+WHERE lead_id = X AND status IN ('pending', 'paused') AND id != current_step_id
+```
+
+This ensures the entire sequence stops when a lead engages.
 
 ---
 
-## 3. Spelling, Spacing, and Copy Review
+## 4. Empty States
 
-After a thorough review of all page files, here are the issues found and fixes:
+Add friendly empty state messages with icons to these locations:
 
-| File | Issue | Fix |
-|------|-------|-----|
-| `src/pages/Dashboard.tsx` line 133 | "vs last month" placeholder text with no actual comparison | Remove or change to a neutral label like "all time" |
-| `src/lib/constants.ts` line 5 | TEAM_MEMBERS constant is hardcoded and outdated (no longer used for role checks) | No code issue, but could be cleaned up |
+| Location | Current | New |
+|----------|---------|-----|
+| TaskBoard -- each column | Shows nothing when empty | "No tasks here yet" with a clipboard icon |
+| Dashboard -- Pipeline Funnel chart | Empty chart | "No leads in pipeline yet" message |
+| NurtureEngine -- Follow-Up Today tab | No explicit empty state | "All caught up! No follow-ups due today." |
+| NurtureEngine -- Needs Attention tab | No explicit empty state | "No leads need attention right now." |
 
-No spelling errors found in button labels, headings, or descriptions across Auth, Dashboard, Pipeline, TaskBoard, CalendarView, SopWiki, NurtureEngine, or TeamManagement pages. The copy is clean.
-
----
-
-## 4. Functional Verification Notes
-
-Based on code review, here is the status of each module:
-
-**Task Board** -- Working correctly:
-- Dispatchers see only their assigned tasks (line 76: `if (!isOwner && t.assigned_to !== user?.id) return false`)
-- Drag-and-drop status changes work via RLS (creator, assignee, or owner can update)
-- Create, edit, delete all functional
-
-**Calendar** -- Working correctly:
-- Dispatchers see only their assigned tasks (line 33: `if (!isOwner) query = query.eq("assigned_to", user.id)`)
-
-**Dashboard** -- Working correctly:
-- Role-based filtering on tasks, activity, and task status charts
-
-**Nurture Engine** -- Working correctly:
-- All CRUD operations use authenticated user context
-- Email sending, sequence management, template library all functional
-
-**Pipeline** -- Working correctly:
-- All leads visible to everyone (collaborative sales tool)
+Files: `src/pages/TaskBoard.tsx`, `src/pages/Dashboard.tsx`, `src/pages/NurtureEngine.tsx`
 
 ---
 
-## 5. Recommendations for Final Features
+## 5. Form Validation with Error Messages
 
-Here are high-impact features that would make this internal app significantly more useful:
+### New Lead Form (`src/pages/Pipeline.tsx`)
+- Company Name: already required -- add red error text if empty on submit
+- Contact Person: already required -- add red error text
+- Phone: add pattern validation accepting only digits, dashes, parentheses, spaces, and plus sign. Show red "Invalid phone number" if pattern fails
+- Email: already uses `type="email"` -- add red error text on invalid
 
-1. **Notification System** -- Push/in-app notifications when a task is assigned to you, when a lead replies, or when a follow-up is due. Currently users have to manually check each page.
+### New Task Form (`src/pages/TaskBoard.tsx`)
+- Title: already required -- add red error text
+- Add a simple client-side validation state that shows inline red error messages below fields when validation fails on submit
 
-2. **Activity Log / Audit Trail** -- A simple log showing who changed what and when (e.g., "Dayron moved Lead X to Qualified at 3:15 PM"). Helpful for accountability in a team environment.
+### Implementation approach:
+- Add a `formErrors` state object to each form
+- Validate on submit before calling the API
+- Show `<p className="text-xs text-destructive mt-1">` messages under each invalid field
+- For phone fields, use regex pattern: `/^[+]?[\d\s()-]*$/`
 
-3. **User Profile Page** -- Let team members update their name, avatar, and contact preferences. Currently profiles are bare-bones.
+---
 
-4. **Mobile-Responsive Polish** -- The sidebar and task board columns could use mobile breakpoint adjustments for dispatchers who work on phones/tablets in the field.
+## 6. Loading / Skeleton States
 
-5. **Dashboard KPI Trends** -- The "vs last month" placeholder on stat cards could show actual month-over-month comparisons using historical data.
+Add skeleton loaders to all data-fetching pages. Use the existing `Skeleton` component from `src/components/ui/skeleton.tsx`.
+
+| Page | What to skeleton |
+|------|-----------------|
+| Dashboard | Stat cards (6 skeleton rectangles), charts (2 skeleton blocks), task list |
+| Pipeline | Kanban columns with 2-3 skeleton cards each |
+| TaskBoard | Board columns with 2-3 skeleton cards each |
+| Contacts | Table rows (5 skeleton rows) |
+| Companies | Table rows (5 skeleton rows) |
+| NurtureEngine | Lead list (3 skeleton cards) |
+
+**Implementation:** Add a `loading` boolean state (default `true`) to each page. Set it to `false` after the initial fetch completes. When `loading` is true, render skeleton placeholders instead of the actual content.
 
 ---
 
 ## Technical Summary
 
 ### Files to Modify
-- `src/pages/SopWiki.tsx` -- Remove `isOwner` guards from all CRUD buttons
-- `src/pages/NurtureEngine.tsx` -- Remove `isOwner` guards from template CRUD buttons
-- `src/pages/Dashboard.tsx` -- Clean up "vs last month" placeholder text
+1. `src/pages/TaskBoard.tsx` -- Race condition fix, empty states per column, form validation, skeleton loader
+2. `src/pages/Pipeline.tsx` -- Phone validation, form error messages, skeleton loader
+3. `src/pages/NurtureEngine.tsx` -- Stop switch logic in handleReplied/handleInterestedCall, empty states for tabs, skeleton loader
+4. `src/pages/Dashboard.tsx` -- Empty state for pipeline chart, skeleton loader for stat cards and charts
+5. `src/pages/Contacts.tsx` -- Skeleton loader for table
+6. `src/pages/Companies.tsx` -- Skeleton loader for table
 
 ### No Database Changes Needed
-RLS policies already support the desired access patterns.
-
+All fixes are client-side logic and UI improvements.
