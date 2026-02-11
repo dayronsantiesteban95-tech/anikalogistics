@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,12 +24,17 @@ export default function CalendarView() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"month" | "week">("month");
+  const { user } = useAuth();
+  const { isOwner } = useUserRole();
 
   useEffect(() => {
-    supabase.from("tasks").select("id, title, priority, due_date, status").then(({ data }) => {
+    if (!user) return;
+    let query = supabase.from("tasks").select("id, title, priority, due_date, status");
+    if (!isOwner) query = query.eq("assigned_to", user.id);
+    query.then(({ data }) => {
       if (data) setTasks(data as Task[]);
     });
-  }, []);
+  }, [user, isOwner]);
 
   const priorityColor = (p: string) => {
     const map: Record<string, string> = { critical: "bg-red-500", high: "bg-orange-500", medium: "bg-yellow-500", low: "bg-green-500" };

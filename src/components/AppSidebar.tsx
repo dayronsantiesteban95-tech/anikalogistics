@@ -11,8 +11,10 @@ import {
   Sun,
   BookOpen,
   Zap,
+  Shield,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Sidebar,
   SidebarContent,
@@ -49,6 +51,7 @@ const resourcesNav = [
 
 export function AppSidebar() {
   const navigate = useNavigate();
+  const { isOwner } = useUserRole();
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [replyCount, setReplyCount] = useState(0);
 
@@ -142,6 +145,22 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isOwner && (
+          <>
+            <Separator className="bg-sidebar-border/30 my-2 mx-3" />
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-sidebar-foreground/50 uppercase text-[10px] tracking-[0.18em] font-semibold mb-2 px-3">
+                Admin
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-0.5">
+                  <NavItem item={{ title: "Team Management", url: "/team", icon: Shield }} />
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
       <SidebarFooter className="p-4 space-y-1">
         <Button
