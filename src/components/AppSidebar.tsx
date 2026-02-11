@@ -9,6 +9,7 @@ import {
   Moon,
   Sun,
   BookOpen,
+  Zap,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -30,6 +31,7 @@ import { useState, useEffect } from "react";
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Growth Pipeline", url: "/pipeline", icon: TrendingUp },
+  { title: "Nurture Engine", url: "/nurture", icon: Zap },
   { title: "Task Board", url: "/tasks", icon: CheckSquare },
   { title: "Calendar", url: "/calendar", icon: CalendarDays },
 ];
