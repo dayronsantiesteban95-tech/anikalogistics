@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -26,7 +27,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
 
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -48,10 +48,27 @@ const resourcesNav = [
 export function AppSidebar() {
   const navigate = useNavigate();
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+  const [replyCount, setReplyCount] = useState(0);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
+
+  // Poll for replied leads every 60 seconds
+  const fetchReplyCount = useCallback(async () => {
+    const { count } = await supabase
+      .from("lead_sequences")
+      .select("*", { count: "exact", head: true })
+      .in("response_status", ["replied", "interested_call"])
+      .neq("status", "completed");
+    setReplyCount(count || 0);
+  }, []);
+
+  useEffect(() => {
+    fetchReplyCount();
+    const interval = setInterval(fetchReplyCount, 60000);
+    return () => clearInterval(interval);
+  }, [fetchReplyCount]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -67,7 +84,12 @@ export function AppSidebar() {
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200"
           activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
         >
-          <item.icon className="h-4 w-4" />
+          <div className="relative">
+            <item.icon className="h-4 w-4" />
+            {item.url === "/nurture" && replyCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-orange-500" />
+            )}
+          </div>
           <span className="text-sm">{item.title}</span>
         </NavLink>
       </SidebarMenuButton>

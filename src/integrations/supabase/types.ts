@@ -230,6 +230,7 @@ export type Database = {
           follow_up_date: string | null
           id: string
           lead_id: string
+          manual_mode: boolean
           note: string | null
           response_status: string
           sent_at: string | null
@@ -243,6 +244,7 @@ export type Database = {
           follow_up_date?: string | null
           id?: string
           lead_id: string
+          manual_mode?: boolean
           note?: string | null
           response_status?: string
           sent_at?: string | null
@@ -256,6 +258,7 @@ export type Database = {
           follow_up_date?: string | null
           id?: string
           lead_id?: string
+          manual_mode?: boolean
           note?: string | null
           response_status?: string
           sent_at?: string | null
