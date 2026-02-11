@@ -189,14 +189,17 @@ export type Database = {
       }
       leads: {
         Row: {
+          city_hub: string | null
           company_id: string | null
           company_name: string
           contact_person: string
           created_at: string
           created_by: string | null
+          delivery_points: string | null
           email: string | null
           estimated_monthly_loads: number | null
           id: string
+          industry: string | null
           main_lanes: string | null
           next_action_date: string | null
           phone: string | null
@@ -204,14 +207,17 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          city_hub?: string | null
           company_id?: string | null
           company_name: string
           contact_person: string
           created_at?: string
           created_by?: string | null
+          delivery_points?: string | null
           email?: string | null
           estimated_monthly_loads?: number | null
           id?: string
+          industry?: string | null
           main_lanes?: string | null
           next_action_date?: string | null
           phone?: string | null
@@ -219,14 +225,17 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          city_hub?: string | null
           company_id?: string | null
           company_name?: string
           contact_person?: string
           created_at?: string
           created_by?: string | null
+          delivery_points?: string | null
           email?: string | null
           estimated_monthly_loads?: number | null
           id?: string
+          industry?: string | null
           main_lanes?: string | null
           next_action_date?: string | null
           phone?: string | null
@@ -267,6 +276,36 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      sop_articles: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
