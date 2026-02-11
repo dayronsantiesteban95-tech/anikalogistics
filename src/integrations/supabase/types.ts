@@ -411,7 +411,14 @@ export type Database = {
     Enums: {
       activity_type: "note" | "email" | "call" | "meeting"
       app_role: "owner" | "dispatcher"
-      department: "onboarding" | "operations" | "prospecting" | "clients"
+      department:
+        | "onboarding"
+        | "operations"
+        | "prospecting"
+        | "clients"
+        | "marketing_growth"
+        | "fleet_courier"
+        | "finance"
       lead_stage:
         | "new_lead"
         | "first_contact"
@@ -549,7 +556,15 @@ export const Constants = {
     Enums: {
       activity_type: ["note", "email", "call", "meeting"],
       app_role: ["owner", "dispatcher"],
-      department: ["onboarding", "operations", "prospecting", "clients"],
+      department: [
+        "onboarding",
+        "operations",
+        "prospecting",
+        "clients",
+        "marketing_growth",
+        "fleet_courier",
+        "finance",
+      ],
       lead_stage: [
         "new_lead",
         "first_contact",

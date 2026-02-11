@@ -31,9 +31,10 @@ export const TASK_STATUSES = [
 
 export const DEPARTMENTS = [
   { value: "onboarding", label: "Onboarding" },
+  { value: "marketing_growth", label: "Marketing/Growth" },
   { value: "operations", label: "Operations" },
-  { value: "prospecting", label: "Prospecting" },
-  { value: "clients", label: "Clients" },
+  { value: "fleet_courier", label: "Fleet/Courier Mgt" },
+  { value: "finance", label: "Finance" },
 ] as const;
 
 export const ACTIVITY_TYPES = [
