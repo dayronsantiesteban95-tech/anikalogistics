@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, CheckSquare, AlertTriangle, Users, Building2, UserCheck, CalendarClock } from "lucide-react";
@@ -25,6 +27,8 @@ const deptLabel = (dept: string | null) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isOwner } = useUserRole();
   const [stats, setStats] = useState({ leads: 0, tasksDueToday: 0, overdue: 0, wonAccounts: 0, companies: 0, contacts: 0 });
   const [pipelineCounts, setPipelineCounts] = useState<{ name: string; value: number }[]>([]);
   const [recentActivity, setRecentActivity] = useState<{ id: string; note: string; activity_type: string; created_at: string }[]>([]);
@@ -32,11 +36,18 @@ export default function Dashboard() {
   const [taskStatusCounts, setTaskStatusCounts] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
+    if (!user) return;
     async function fetchStats() {
       const today = new Date().toISOString().split("T")[0];
+      const userId = user!.id;
+
+      // Tasks queries - dispatchers only see their assigned tasks
+      let tasksTodayQuery = supabase.from("tasks").select("id", { count: "exact", head: true }).eq("due_date", today).neq("status", "done");
+      if (!isOwner) tasksTodayQuery = tasksTodayQuery.eq("assigned_to", userId);
+
       const [leadsRes, tasksTodayRes, overdueRes, wonRes, companiesRes, contactsRes] = await Promise.all([
         supabase.from("leads").select("id", { count: "exact", head: true }),
-        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("due_date", today).neq("status", "done"),
+        tasksTodayQuery,
         supabase.from("leads").select("id", { count: "exact", head: true }).lt("next_action_date", today),
         supabase.from("leads").select("id", { count: "exact", head: true }).eq("stage", "account_won"),
         supabase.from("companies").select("id", { count: "exact", head: true }),
@@ -57,30 +68,39 @@ export default function Dashboard() {
       allLeads?.forEach((l) => { counts[l.stage] = (counts[l.stage] || 0) + 1; });
       setPipelineCounts(LEAD_STAGES.map((s) => ({ name: s.label, value: counts[s.value] })));
 
-      const { data: activity } = await supabase
+      // Activity - owners see all, dispatchers see their own
+      let activityQuery = supabase
         .from("lead_interactions")
         .select("id, note, activity_type, created_at")
         .order("created_at", { ascending: false })
         .limit(8);
+      if (!isOwner) activityQuery = activityQuery.eq("created_by", userId);
+      const { data: activity } = await activityQuery;
       if (activity) setRecentActivity(activity);
 
-      const { data: tasks } = await supabase
+      // Upcoming tasks - dispatchers only see assigned
+      let tasksQuery = supabase
         .from("tasks")
         .select("*")
         .neq("status", "done")
         .not("due_date", "is", null)
         .order("due_date", { ascending: true })
         .limit(5);
+      if (!isOwner) tasksQuery = tasksQuery.eq("assigned_to", userId);
+      const { data: tasks } = await tasksQuery;
       if (tasks) setUpcomingTasks(tasks);
 
-      const { data: allTasks } = await supabase.from("tasks").select("status");
+      // Task status - dispatchers only see their tasks
+      let allTasksQuery = supabase.from("tasks").select("status");
+      if (!isOwner) allTasksQuery = allTasksQuery.eq("assigned_to", userId);
+      const { data: allTasks } = await allTasksQuery;
       const statusCounts: Record<string, number> = {};
       TASK_STATUSES.forEach((s) => (statusCounts[s.value] = 0));
       allTasks?.forEach((t) => { statusCounts[t.status] = (statusCounts[t.status] || 0) + 1; });
       setTaskStatusCounts(TASK_STATUSES.map((s) => ({ name: s.label, value: statusCounts[s.value] })));
     }
     fetchStats();
-  }, []);
+  }, [user, isOwner]);
 
   const statCards = [
     { label: "Active Leads", value: stats.leads, icon: TrendingUp, color: "text-accent" },

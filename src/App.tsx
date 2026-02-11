@@ -14,6 +14,7 @@ import Companies from "@/pages/Companies";
 import Contacts from "@/pages/Contacts";
 import SopWiki from "@/pages/SopWiki";
 import NurtureEngine from "@/pages/NurtureEngine";
+import TeamManagement from "@/pages/TeamManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/sop-wiki" element={<SopWiki />} />
             <Route path="/nurture" element={<NurtureEngine />} />
+            <Route path="/team" element={<TeamManagement />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Route>
           <Route path="*" element={<NotFound />} />

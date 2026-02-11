@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/accordion";
 import { Plus, Search, Pencil, Trash2, BookOpen, LayoutGrid, List } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 
 type SopArticle = {
@@ -43,6 +44,7 @@ export default function SopWiki() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("cheatsheet");
   const { user } = useAuth();
+  const { isOwner } = useUserRole();
   const { toast } = useToast();
 
   const fetchArticles = useCallback(async () => {
@@ -118,9 +120,11 @@ export default function SopWiki() {
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Standard Operating Procedures — The Anika Playbook</p>
         </div>
-        <Button onClick={() => { setEditArticle(null); setShowForm(true); }} className="gap-2">
-          <Plus className="h-4 w-4" /> New Article
-        </Button>
+        {isOwner && (
+          <Button onClick={() => { setEditArticle(null); setShowForm(true); }} className="gap-2">
+            <Plus className="h-4 w-4" /> New Article
+          </Button>
+        )}
       </div>
 
       {/* Filters & View Toggle */}
@@ -180,14 +184,16 @@ export default function SopWiki() {
                       </div>
                       <div className="flex items-center gap-2 pt-2 border-t">
                         <span className="text-[10px] text-muted-foreground">Updated {new Date(article.updated_at).toLocaleDateString()}</span>
-                        <div className="ml-auto flex gap-1">
-                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditArticle(article); setShowForm(true); }}>
-                            <Pencil className="h-3 w-3 mr-1" /> Edit
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteId(article.id)}>
-                            <Trash2 className="h-3 w-3 mr-1" /> Delete
-                          </Button>
-                        </div>
+                        {isOwner && (
+                          <div className="ml-auto flex gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditArticle(article); setShowForm(true); }}>
+                              <Pencil className="h-3 w-3 mr-1" /> Edit
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteId(article.id)}>
+                              <Trash2 className="h-3 w-3 mr-1" /> Delete
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -206,17 +212,19 @@ export default function SopWiki() {
               onClick={() => setViewArticle(article)}
             >
               <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-base leading-tight">{article.title}</CardTitle>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); setEditArticle(article); setShowForm(true); }} className="p-1 rounded hover:bg-muted">
-                      <Pencil className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); setDeleteId(article.id); }} className="p-1 rounded hover:bg-destructive/10">
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </button>
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-base leading-tight">{article.title}</CardTitle>
+                    {isOwner && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={(e) => { e.stopPropagation(); setEditArticle(article); setShowForm(true); }} className="p-1 rounded hover:bg-muted">
+                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteId(article.id); }} className="p-1 rounded hover:bg-destructive/10">
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
               </CardHeader>
               <CardContent className="space-y-2">
                 <Badge variant="secondary" className="text-[10px]">{getCategoryLabel(article.category)}</Badge>
@@ -262,14 +270,16 @@ export default function SopWiki() {
                 </DialogDescription>
               </DialogHeader>
               <div className="whitespace-pre-wrap text-sm leading-relaxed">{viewArticle.content}</div>
-              <div className="flex gap-2 mt-4">
-                <Button variant="outline" size="sm" onClick={() => { setEditArticle(viewArticle); setShowForm(true); setViewArticle(null); }}>
-                  <Pencil className="h-3 w-3 mr-1" /> Edit
-                </Button>
-                <Button variant="destructive" size="sm" onClick={() => { setDeleteId(viewArticle.id); setViewArticle(null); }}>
-                  <Trash2 className="h-3 w-3 mr-1" /> Delete
-                </Button>
-              </div>
+              {isOwner && (
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" size="sm" onClick={() => { setEditArticle(viewArticle); setShowForm(true); setViewArticle(null); }}>
+                    <Pencil className="h-3 w-3 mr-1" /> Edit
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => { setDeleteId(viewArticle.id); setViewArticle(null); }}>
+                    <Trash2 className="h-3 w-3 mr-1" /> Delete
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </DialogContent>
