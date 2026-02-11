@@ -13,6 +13,7 @@ import CalendarView from "@/pages/CalendarView";
 import Companies from "@/pages/Companies";
 import Contacts from "@/pages/Contacts";
 import SopWiki from "@/pages/SopWiki";
+import NurtureEngine from "@/pages/NurtureEngine";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/companies" element={<Companies />} />
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/sop-wiki" element={<SopWiki />} />
+            <Route path="/nurture" element={<NurtureEngine />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Route>
           <Route path="*" element={<NotFound />} />

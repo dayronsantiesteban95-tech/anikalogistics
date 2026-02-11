@@ -119,6 +119,42 @@ export type Database = {
           },
         ]
       }
+      email_templates: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          hub: string
+          id: string
+          name: string
+          step_type: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          hub: string
+          id?: string
+          name: string
+          step_type: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          hub?: string
+          id?: string
+          name?: string
+          step_type?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       follow_up_rules: {
         Row: {
           created_at: string
@@ -180,6 +216,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "lead_interactions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_sequences: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          follow_up_date: string | null
+          id: string
+          lead_id: string
+          response_status: string
+          sent_at: string | null
+          status: string
+          step_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          follow_up_date?: string | null
+          id?: string
+          lead_id: string
+          response_status?: string
+          sent_at?: string | null
+          status?: string
+          step_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          follow_up_date?: string | null
+          id?: string
+          lead_id?: string
+          response_status?: string
+          sent_at?: string | null
+          status?: string
+          step_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_sequences_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
