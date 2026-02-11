@@ -87,7 +87,8 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
   call: <Phone className="h-3.5 w-3.5" />,
 };
 
-const HUBS = ["Miami", "Phoenix", "LA"];
+const HUBS = ["miami", "phoenix", "la"];
+const HUB_LABELS: Record<string, string> = { miami: "Miami", phoenix: "Phoenix", la: "LA" };
 
 // ── Dynamic template variable replacement ──
 function replaceTemplateVars(text: string, lead?: LeadWithSequences | null): string {
@@ -956,7 +957,7 @@ export default function NurtureEngine() {
             <div className="flex gap-1">
               <Button variant={hubFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setHubFilter("all")}>All</Button>
               {HUBS.map((h) => (
-                <Button key={h} variant={hubFilter === h ? "default" : "outline"} size="sm" onClick={() => setHubFilter(h)}>{h}</Button>
+                <Button key={h} variant={hubFilter === h ? "default" : "outline"} size="sm" onClick={() => setHubFilter(h)}>{HUB_LABELS[h] || h}</Button>
               ))}
             </div>
             {isOwner && (
@@ -988,7 +989,7 @@ export default function NurtureEngine() {
                         <p className="text-xs text-muted-foreground mt-0.5">{t.subject}</p>
                       </div>
                       <div className="flex gap-1">
-                        <Badge variant="outline" className="text-[10px]">{t.hub}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{HUB_LABELS[t.hub] || t.hub}</Badge>
                         <Badge variant="secondary" className="text-[10px]">{STEP_LABELS[t.step_type] || t.step_type}</Badge>
                       </div>
                     </div>
@@ -1035,10 +1036,10 @@ export default function NurtureEngine() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Hub</Label>
-                <Select name="hub" defaultValue={editTemplate?.hub ?? "Miami"}>
+                <Select name="hub" defaultValue={editTemplate?.hub ?? "miami"}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {HUBS.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                    {HUBS.map((h) => <SelectItem key={h} value={h}>{HUB_LABELS[h] || h}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
