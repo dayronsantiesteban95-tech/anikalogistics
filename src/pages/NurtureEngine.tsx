@@ -26,7 +26,7 @@ import {
 import {
   Mail, Phone, Clock, ChevronDown, ChevronRight, Copy, Plus, Pencil, Trash2,
   Play, CheckCircle, PhoneCall, AlertCircle, Settings, RotateCcw, Snowflake, ArrowRight,
-  Calendar, Wrench, Hand,
+  Calendar, Wrench, Hand, Send, Loader2,
 } from "lucide-react";
 import { format, differenceInDays, addDays } from "date-fns";
 
@@ -36,6 +36,7 @@ type LeadWithSequences = {
   contact_person: string;
   city_hub: string | null;
   industry: string | null;
+  email: string | null;
   stage: string;
 };
 
@@ -248,7 +249,7 @@ export default function NurtureEngine() {
     if (leadIds.length) {
       const { data: leads } = await supabase
         .from("leads")
-        .select("id, company_name, contact_person, city_hub, industry, stage")
+        .select("id, company_name, contact_person, city_hub, industry, email, stage")
         .in("id", leadIds);
       if (leads) {
         const map: Record<string, LeadWithSequences> = {};
@@ -272,7 +273,7 @@ export default function NurtureEngine() {
     if (leadIds.length) {
       const { data: leads } = await supabase
         .from("leads")
-        .select("id, company_name, contact_person, city_hub, industry, stage")
+        .select("id, company_name, contact_person, city_hub, industry, email, stage")
         .in("id", leadIds);
       if (leads) {
         const map: Record<string, LeadWithSequences> = {};
@@ -286,7 +287,7 @@ export default function NurtureEngine() {
   const fetchTracker = useCallback(async () => {
     const { data: leads } = await supabase
       .from("leads")
-      .select("id, company_name, contact_person, city_hub, industry, stage")
+      .select("id, company_name, contact_person, city_hub, industry, email, stage")
       .eq("stage", "new_lead")
       .order("created_at", { ascending: false });
     if (!leads) return;
@@ -569,6 +570,39 @@ export default function NurtureEngine() {
     toast({ title: "Copied to clipboard!" });
   };
 
+  // ── Send Email via Edge Function ──
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+
+  const sendOutreachEmail = async (step: SequenceStep, lead: LeadWithSequences, template: EmailTemplate) => {
+    if (!lead.email) {
+      toast({ title: "No email address", description: `${lead.company_name} has no email set. Add one in the Pipeline first.`, variant: "destructive" });
+      return;
+    }
+    setSendingEmail(step.id);
+    try {
+      const subject = replaceTemplateVars(template.subject, lead);
+      const body = replaceTemplateVars(template.body, lead);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-outreach-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ to: lead.email, subject, body, sequence_id: step.id }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to send");
+      toast({ title: "📧 Email Sent!", description: `Sent "${subject}" to ${lead.email}` });
+      fetchFollowUps();
+      fetchTracker();
+    } catch (err: any) {
+      toast({ title: "Send failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSendingEmail(null);
+    }
+  };
+
   // ── Helpers ──
   const daysOverdue = (date: string | null) => {
     if (!date) return 0;
@@ -614,6 +648,18 @@ export default function NurtureEngine() {
             >
               <Copy className="h-3 w-3" /> Copy
             </Button>
+            {lead && (step.step_type === "email_1" || step.step_type === "email_2") && (
+              <Button
+                size="sm"
+                variant="default"
+                className="h-6 px-2 text-xs gap-1"
+                disabled={sendingEmail === step.id}
+                onClick={() => lead && sendOutreachEmail(step, lead, matchedTemplate)}
+              >
+                {sendingEmail === step.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                {sendingEmail === step.id ? "Sending..." : "Send Email"}
+              </Button>
+            )}
           </div>
         )}
         <div className="flex gap-2 flex-wrap">
