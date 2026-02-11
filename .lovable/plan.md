@@ -1,102 +1,141 @@
 
-## Add Example Email Templates for Anika Outreach Engine
 
-Create 9 example email templates (3 hubs × 3 steps) with dynamic variables that follow the Anika sales methodology.
+# UI Overhaul & Lead Form Redesign
 
----
-
-### What We're Building
-
-The system currently has:
-- An empty `email_templates` table
-- A template suggestion feature that automatically shows matching templates when working sequence steps (matching on `hub` and `step_type`)
-- Dynamic variable replacement: `[Name]`, `[Company]`, `[City Hub]`, `[Industry]` get interpolated based on the lead's data
-- A Template Library tab where owners can view, copy, and manage templates
-
-We'll add 9 example templates representing the complete Anika outreach flow:
-
-**Day 1 - Introduction** (Value-focused, introduce your 6-hour radius capability)
-- Miami: Focus on South Florida logistics landscape
-- Phoenix: Focus on Southwest delivery zones  
-- LA: Focus on Southern California market
-
-**Day 4 - Social Proof** (Case study showing success in their industry/hub)
-- Miami: Medical/pharma success story in South Florida
-- Phoenix: E-commerce last-mile case study
-- LA: Auto parts logistical win
-
-**Day 8 - Low Friction Offer** (Risk-free trial: beat provider's time or it's free)
-- Miami: White-glove service guarantee
-- Phoenix: Speed guarantee on hotshot deliveries
-- LA: Cost-match guarantee on weekly loads
+## Overview
+Modernize the entire Anika Logistics CRM with the official logo, polished Cortana-inspired design, last-mile delivery metrics in the lead form, an interactive calendar date picker, and thorough end-to-end testing.
 
 ---
 
-### Implementation Strategy
+## 1. Add Official Logos to the Project
 
-**Database Approach:**
-We'll directly insert 9 pre-crafted email templates into the `email_templates` table using a database operation. Each template:
-- Has a unique name (e.g., "Miami Day 1: Introduction")
-- Is tagged with a hub (`Miami`, `Phoenix`, or `LA`)
-- Is tagged with a step type (`email_1`, `email_2`, or `call`)
-- Contains a subject line appropriate for the step
-- Contains email body with dynamic variables `[Name]`, `[Company]`, `[City Hub]`, `[Industry]` embedded naturally
+Copy the uploaded logo files into `src/assets/`:
+- `logo-azul.png` -- blue logo for header (light mode)
+- `logo-blanco.png` -- white logo for sidebar (dark background)
+- `perfil-logo-azul.jpg` -- square avatar for favicon/branding
 
-**Content Design:**
-Each template follows the Anika methodology:
-1. **Day 1 (email_1):** Opens with value prop ("We handle the 6-hour radius so you don't"). Uses `[City Hub]` and `[Industry]` to be contextually relevant. Soft CTA: "Check your coverage map."
-2. **Day 4 (email_2):** Leads with recent win ("We just completed a hotshot for [Industry] in [City Hub]"). Shows social proof. CTA: "How we did it + your free assessment."
-3. **Day 8 (call):** Low-friction offer ("Give us your hardest delivery this week. If we don't beat your time, it's on us."). Creates urgency. CTA: Action-oriented.
+Update **GlobalHeader.tsx**: Replace the Truck icon + text with an `<img>` tag using the blue logo (`logo-azul.png`), sized to ~160px width.
+
+Update **AppSidebar.tsx**: Add the white logo (`logo-blanco.png`) at the top of the sidebar content area, sized appropriately for the sidebar width.
 
 ---
 
-### Files Changed
+## 2. Cortana-Inspired UI Polish
 
-| File | Change |
-|---|---|
-| Database (email_templates) | Insert 9 new template rows via SQL migration |
+### Global Header
+- Clean, minimal header with logo on the left and timezone clocks on the right
+- Add subtle bottom shadow instead of hard border
+- Slightly taller (h-16) for breathing room
 
-No code changes needed—the existing system already:
-- Queries templates by `hub` and `step_type`
-- Replaces variables at render time using `replaceTemplateVars()`
-- Displays suggestions in the BifurcationButtons component
-- Allows copying to clipboard with variables pre-filled
+### Sidebar
+- Add the white logo at the top with padding
+- Increase spacing between nav groups
+- Rounded pill-style active state with the orange accent
+- Smoother hover transitions
+- Add a subtle separator line between groups
 
----
+### Dashboard (Cortana-inspired stat cards)
+- Each stat card gets a small sparkline/trend icon on the right (already has icons, enhance with subtle gradient backgrounds)
+- Add "vs last month" style micro-text beneath numbers (placeholder for now)
+- Rounded-2xl cards with slightly larger padding
+- Subtle hover scale effect on cards
 
-### Example Template Content (Abbreviated)
-
-**Miami - Day 1 Introduction:**
-- Subject: "6-hour delivery coverage in [City Hub]"
-- Body: "Hi [Name], we handle all logistics in [City Hub] so you don't. Medical/pharma? Auto parts? E-commerce? We've got a truck within 6 hours of your facility..."
-
-**Miami - Day 4 Social Proof:**
-- Subject: "We just nailed a hotshot for [Industry] in [City Hub]"
-- Body: "Hi [Name], yesterday we completed an emergency medical shipment from Miami to Jacksonville in 3 hours. Your competitors took 6+..."
-
-**Miami - Day 8 Low Friction Offer:**
-- Subject: "[Company], let's prove it—risk free"
-- Body: "Hi [Name], give us your hardest delivery this week. If we don't beat [Company]'s current provider's time, the delivery is free..."
-
-(Similar patterns for Phoenix and LA with hub-specific language and industry examples)
+### Pipeline Kanban
+- Wider column headers with colored top-border per stage (using a gradient from navy to orange across stages)
+- Smoother card hover with translateY(-2px) lift effect
+- Better spacing and rounded corners on kanban columns
+- Stage header badges with colored dots instead of plain numbers
 
 ---
 
-### What Happens After Implementation
+## 3. Redesign "New Lead" Form for Last-Mile Delivery
 
-Once templates are inserted:
-1. Owners see all 9 templates in the Template Library tab, grouped by hub
-2. Dispatchers working the Sequence Tracker or Follow-Up Today tabs see template suggestions auto-loaded for each step
-3. When they click "Copy," the body gets variables replaced: `[Name]` → contact name, `[Company]` → company name, etc.
-4. Dispatchers can modify/use the suggested text or create their own via the "New Template" button
+### Remove
+- "Main Lanes" field (not relevant to last-mile)
+
+### Replace/Add Last-Mile Specific Fields
+- **Service Type** (select): Last Mile, Courier, White-Glove, 6-Hour Hotshot
+- **Avg. Packages/Day** (number): estimated daily package volume
+- **Delivery Radius (miles)** (number): typical delivery radius
+- **Vehicle Type Required** (select): Cargo Van, Sprinter, Box Truck, Car/SUV
+- **SLA Requirement** (text): e.g. "Same-day by 5pm", "Next-day"
+
+### Keep existing fields
+- Company Name, Contact Person, Phone, Email
+- Est. Monthly Loads, City Hub, Industry
+- Next Action Date (will become interactive calendar)
+- Delivery Points
+
+### Form Layout
+- Organized into sections with subtle dividers:
+  - "Contact Information" (company, person, phone, email)
+  - "Delivery Metrics" (service type, packages/day, radius, vehicle, SLA, monthly loads)
+  - "Location & Scheduling" (city hub, industry, delivery points, next action date)
 
 ---
 
-### Technical Notes
+## 4. Interactive Calendar for Next Action Date
 
-- All 9 templates will be inserted with `created_by = NULL` (system defaults) or the owner's user ID if preferred
-- Templates use natural language for variables (not code variables) so they're human-readable: `[Name]` not `{{name}}`
-- The `hub` field is case-sensitive in queries; we use exact capitalization: `"Miami"`, `"Phoenix"`, `"LA"`
-- The `step_type` field uses: `"email_1"`, `"email_2"`, `"call"` (exact lowercase)
-- Templates are industry-agnostic in language but mention logistics-specific scenarios (medical, auto parts, e-commerce) to feel authentic
+Replace the plain `<Input type="date">` with the Shadcn **DatePicker** component (Popover + Calendar):
+- Button trigger showing the selected date in a readable format (e.g. "Feb 15, 2026")
+- Calendar popup with `pointer-events-auto` class for dialog compatibility
+- Disable past dates for next action scheduling
+- Show a placeholder "Pick a date" when empty
+
+---
+
+## 5. Database Migration
+
+Add new columns to the `leads` table:
+- `service_type` (text, nullable) -- values: last_mile, courier, white_glove, hotshot
+- `avg_packages_day` (integer, nullable)
+- `delivery_radius_miles` (integer, nullable)
+- `vehicle_type` (text, nullable)
+- `sla_requirement` (text, nullable)
+
+The `main_lanes` column will be kept in the database for backward compatibility but removed from the UI form.
+
+---
+
+## 6. Constants Update
+
+Add to `src/lib/constants.ts`:
+- `SERVICE_TYPES` array: Last Mile, Courier, White-Glove, 6-Hour Hotshot
+- `VEHICLE_TYPES` array: Cargo Van, Sprinter, Box Truck, Car/SUV
+
+---
+
+## 7. End-to-End Testing Plan
+
+After implementation, manually verify:
+1. Logo displays correctly in header and sidebar (both light and dark mode)
+2. Create a new lead using the redesigned form -- verify all new fields save correctly
+3. Test the interactive calendar date picker opens, selects dates, and saves
+4. Edit an existing lead -- verify pre-populated values
+5. Drag-and-drop a lead between pipeline stages
+6. Verify dark mode toggle still works with new logo variants
+7. Check mobile responsiveness of the redesigned form and pipeline
+
+---
+
+## Technical Details
+
+### Files to Create
+- `src/assets/logo-azul.png` (copy from uploads)
+- `src/assets/logo-blanco.png` (copy from uploads)
+
+### Files to Modify
+- `src/components/GlobalHeader.tsx` -- logo image, styling
+- `src/components/AppSidebar.tsx` -- sidebar logo, spacing, polish
+- `src/pages/Pipeline.tsx` -- lead form redesign, interactive calendar, card polish, new fields
+- `src/pages/Dashboard.tsx` -- card styling enhancements
+- `src/lib/constants.ts` -- SERVICE_TYPES, VEHICLE_TYPES
+- `src/index.css` -- minor utility class additions for hover effects
+
+### Database Migration
+- ALTER TABLE leads ADD COLUMN service_type text;
+- ALTER TABLE leads ADD COLUMN avg_packages_day integer;
+- ALTER TABLE leads ADD COLUMN delivery_radius_miles integer;
+- ALTER TABLE leads ADD COLUMN vehicle_type text;
+- ALTER TABLE leads ADD COLUMN sla_requirement text;
 
