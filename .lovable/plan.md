@@ -1,114 +1,134 @@
 
 
-# Functional Logic, UX, and Edge Case Hardening
+# Professional Email Templates + Atlanta Hub Update
 
 ## Overview
-This plan addresses six areas: fixing the CRM-to-Task data link, adding automation safety (stop switch), improving empty states, adding form validation with error messages, and adding skeleton loading states. The "Total Pipeline Value" item is noted as not applicable since the database has no estimated value field on leads.
+Two changes: (1) Replace Miami with Atlanta across the entire app (timezone clock, city hubs, action zone cities, nurture engine hub labels), and (2) seed the template library with 15 professionally written email templates -- 5 per outreach step -- using real Anika Logistics Group messaging pulled from the website.
+
+All templates will use dynamic variables `[Name]`, `[Company]`, `[City Hub]`, and `[Industry]` so they auto-personalize for every lead.
 
 ---
 
-## 1. CRM to Task Sync Fix (Race Condition)
+## Part 1: Atlanta Replaces Miami
 
-**File:** `src/pages/TaskBoard.tsx`
+### Files to modify:
 
-**Problem:** When creating a task linked to a lead, the code inserts the task and then queries for the "most recent task" to get its ID. This is a race condition -- two simultaneous creates could link the wrong task.
+**`src/lib/constants.ts`**
+- `TIMEZONES`: Change `{ city: "Miami", ... }` to `{ city: "Atlanta", timezone: "America/New_York", abbr: "EST" }`
+- `CITY_HUBS`: Change `{ value: "miami", label: "Miami" }` to `{ value: "atlanta", label: "Atlanta" }`
+- `ACTION_ZONE_CITIES`: Replace the `miami` key with `atlanta` and update cities to Atlanta-area metros (Atlanta, Marietta, Decatur, Savannah, Augusta, Macon, Athens, Alpharetta, Roswell, Sandy Springs, Kennesaw, Duluth, Lawrenceville, Columbus, Chattanooga)
 
-**Fix:**
-- Change the insert call to use `.select("id").single()` which returns the newly created row's ID directly
-- Use that ID to insert into `task_lead_links`
-- Show the linked lead name on task cards by fetching `task_lead_links` and joining with leads
+**`src/pages/NurtureEngine.tsx`**
+- Update `HUBS` array: replace `"miami"` with `"atlanta"`
+- Update `HUB_LABELS`: replace `miami: "Miami"` with `atlanta: "Atlanta"`
 
-**Changes:**
-- Refactor `handleSubmit` to capture the inserted task ID from the insert response
-- Fetch `task_lead_links` alongside tasks and display a small badge on linked task cards showing the lead company name
-
----
-
-## 2. Pipeline Value -- Not Applicable
-
-The leads table has `estimated_monthly_loads` but no monetary `estimated_value` column. The Dashboard does not show a "Total Pipeline Value" stat, so there is no dummy data to replace. If you want a pipeline value metric in the future, a new column would need to be added to leads.
+**`src/components/GlobalHeader.tsx`** -- No change needed (it reads from constants)
 
 ---
 
-## 3. Automation Safety -- Stop Switch
+## Part 2: 15 Email Templates (Database Insert via Edge Function or Direct Insert)
 
-**File:** `src/pages/NurtureEngine.tsx`
+Templates will be inserted into the `email_templates` table. Since the table requires `created_by = auth.uid()`, the templates will be added programmatically through a one-time seeder component that inserts them when triggered by the logged-in user.
 
-**Problem:** When a lead replies or shows interest (handleReplied, handleInterestedCall), only the clicked step is marked "completed." Other pending/paused steps for the same lead remain active and will surface in Follow-Up Today.
+### Template Structure
 
-**Fix:** In both `handleReplied` and `handleInterestedCall`, after marking the current step as completed, also mark ALL other pending/paused steps for the same lead as "completed" with response_status "stopped":
+Each template has: `name`, `hub` (atlanta/phoenix/la), `step_type` (email_1/email_2/call), `subject`, `body`
 
-```sql
-UPDATE lead_sequences 
-SET status = 'completed', response_status = 'stopped'
-WHERE lead_id = X AND status IN ('pending', 'paused') AND id != current_step_id
-```
+Since 5 templates per step x 3 steps = 15 templates, and they should work across all hubs, the hub will be set to each of the 3 hubs (atlanta, phoenix, la), giving 15 x 3 = 45 total rows. However, the content is the same across hubs -- only the `[City Hub]` variable makes it location-specific. To keep it manageable and avoid bloat, I will create 5 templates per step assigned to `atlanta` as the primary hub, and the user can duplicate for other hubs via the existing template UI.
 
-This ensures the entire sequence stops when a lead engages.
+Actually, looking at the `findTemplate` function -- it matches on `hub + step_type` and returns the first match. So to have 5 options per step per hub, the user selects which one to use. The current UI shows all templates in the Template Library tab, grouped by hub. The `findTemplate` function only auto-matches ONE template per hub+step combo for the Follow-Up Today flow.
+
+**Approach**: Create 5 templates per step for all 3 hubs (atlanta, phoenix, la). Each hub gets the same 5 variations. That is 5 x 3 steps x 3 hubs = 45 templates. To keep things practical, I will create 15 unique templates (5 per step) and replicate across all 3 hubs = 45 rows.
+
+### Email Content (All 15 unique templates)
+
+#### Step 1: Day 1 -- Introduction (email_1)
+
+**Template 1 -- "The Straight Shooter"**
+- Subject: `Quick question about [Company]'s deliveries`
+- Body: Professional intro referencing Anika's reliability-first approach, mentioning the specific industry and city hub.
+
+**Template 2 -- "The Problem Solver"**
+- Subject: `Delivery headaches in [City Hub]? We fix those.`
+- Body: Opens with a common logistics pain point, positions Anika as the solution with real-time tracking and proof of delivery.
+
+**Template 3 -- "The Warm Referral"**
+- Subject: `[Name], a quick note from Anika Logistics`
+- Body: Personal tone, mentions working with similar companies in their industry, invites a conversation.
+
+**Template 4 -- "The Value Lead"**
+- Subject: `How [Industry] companies cut delivery failures by 40%`
+- Body: Leads with a compelling stat/claim, ties it to Anika's service capabilities (white-glove, same-day, last-mile).
+
+**Template 5 -- "The Local Partner"**
+- Subject: `Your [City Hub] logistics partner -- quick intro`
+- Body: Emphasizes local presence, TSA-trained personnel, 24/7 availability, and the "we move what matters" promise.
+
+#### Step 2: Day 4 -- Social Proof (email_2)
+
+**Template 1 -- "The Case Study"**
+- Subject: `How we handle [Industry] deliveries in [City Hub]`
+- Body: Describes a realistic scenario of handling time-sensitive deliveries, emphasizes proof of delivery and SLA compliance.
+
+**Template 2 -- "The Numbers"**
+- Subject: `Re: Quick question about [Company]'s deliveries`
+- Body: Follow-up referencing the first email, shares operational capabilities (fleet types, coverage area, response times).
+
+**Template 3 -- "The Trust Builder"**
+- Subject: `[Name], just following up`
+- Body: Short and human, reiterates Anika's core value -- "trust is earned through consistency" -- and offers a no-pressure conversation.
+
+**Template 4 -- "The Service Menu"**
+- Subject: `8 ways Anika can support [Company]`
+- Body: Lists all service types (Last-Mile, White-Glove, AOG, Same-Day, Airport Transfers, Legal Courier, Hot Shot, Hand Carry) relevant to their industry.
+
+**Template 5 -- "The Differentiator"**
+- Subject: `What makes us different from your current provider`
+- Body: Addresses common frustrations (missed ETAs, no communication, no proof), contrasts with Anika's discipline and accountability.
+
+#### Step 3: Day 8 -- Low Friction Offer (call)
+
+**Template 1 -- "The Pilot Offer"**
+- Subject: `Let's do a trial run, [Name] -- zero commitment`
+- Body: Offers a free pilot/trial delivery to demonstrate capability, zero risk framing.
+
+**Template 2 -- "The Quick Call"**
+- Subject: `15 minutes to see if we're a fit?`
+- Body: Asks for a brief call, mentions specific value props relevant to their industry, easy calendar link framing.
+
+**Template 3 -- "The Last Touch"**
+- Subject: `[Name], one last thing before I go quiet`
+- Body: Respectful "breakup email" style -- acknowledges they're busy, leaves the door open, provides direct contact.
+
+**Template 4 -- "The Custom Quote"**
+- Subject: `Custom logistics quote for [Company]`
+- Body: Offers to prepare a tailored quote based on their volume, routes, and service needs. No obligation.
+
+**Template 5 -- "The Direct Line"**
+- Subject: `My direct line for [Company]`
+- Body: Short, gives a direct phone number and availability window, very human and low-pressure.
 
 ---
 
-## 4. Empty States
+## Implementation Plan
 
-Add friendly empty state messages with icons to these locations:
+### Step 1: Update constants and NurtureEngine hub references
+- Modify `src/lib/constants.ts` (TIMEZONES, CITY_HUBS, ACTION_ZONE_CITIES)
+- Modify `src/pages/NurtureEngine.tsx` (HUBS array and HUB_LABELS)
 
-| Location | Current | New |
-|----------|---------|-----|
-| TaskBoard -- each column | Shows nothing when empty | "No tasks here yet" with a clipboard icon |
-| Dashboard -- Pipeline Funnel chart | Empty chart | "No leads in pipeline yet" message |
-| NurtureEngine -- Follow-Up Today tab | No explicit empty state | "All caught up! No follow-ups due today." |
-| NurtureEngine -- Needs Attention tab | No explicit empty state | "No leads need attention right now." |
+### Step 2: Create a template seeder
+- Add a utility function/component that inserts the 45 templates (15 unique x 3 hubs) into `email_templates` table
+- This will be triggered from the Template Library tab via a "Load Anika Templates" button
+- After seeding, the button disappears (checks if templates already exist)
+- Templates include full professional email copy with `[Name]`, `[Company]`, `[City Hub]`, `[Industry]` variables
 
-Files: `src/pages/TaskBoard.tsx`, `src/pages/Dashboard.tsx`, `src/pages/NurtureEngine.tsx`
+### Step 3: Write the actual email copy
+- All 15 unique email bodies will be written with professional, human tone
+- Based on real Anika website content: tagline, values, services, coverage areas
+- Each email is 4-8 lines max -- concise, scannable, no fluff
 
----
+### Files to modify
+1. `src/lib/constants.ts` -- Hub/timezone swap
+2. `src/pages/NurtureEngine.tsx` -- Hub labels + seeder button in Template Library tab
+3. No database migration needed -- uses existing `email_templates` table
 
-## 5. Form Validation with Error Messages
-
-### New Lead Form (`src/pages/Pipeline.tsx`)
-- Company Name: already required -- add red error text if empty on submit
-- Contact Person: already required -- add red error text
-- Phone: add pattern validation accepting only digits, dashes, parentheses, spaces, and plus sign. Show red "Invalid phone number" if pattern fails
-- Email: already uses `type="email"` -- add red error text on invalid
-
-### New Task Form (`src/pages/TaskBoard.tsx`)
-- Title: already required -- add red error text
-- Add a simple client-side validation state that shows inline red error messages below fields when validation fails on submit
-
-### Implementation approach:
-- Add a `formErrors` state object to each form
-- Validate on submit before calling the API
-- Show `<p className="text-xs text-destructive mt-1">` messages under each invalid field
-- For phone fields, use regex pattern: `/^[+]?[\d\s()-]*$/`
-
----
-
-## 6. Loading / Skeleton States
-
-Add skeleton loaders to all data-fetching pages. Use the existing `Skeleton` component from `src/components/ui/skeleton.tsx`.
-
-| Page | What to skeleton |
-|------|-----------------|
-| Dashboard | Stat cards (6 skeleton rectangles), charts (2 skeleton blocks), task list |
-| Pipeline | Kanban columns with 2-3 skeleton cards each |
-| TaskBoard | Board columns with 2-3 skeleton cards each |
-| Contacts | Table rows (5 skeleton rows) |
-| Companies | Table rows (5 skeleton rows) |
-| NurtureEngine | Lead list (3 skeleton cards) |
-
-**Implementation:** Add a `loading` boolean state (default `true`) to each page. Set it to `false` after the initial fetch completes. When `loading` is true, render skeleton placeholders instead of the actual content.
-
----
-
-## Technical Summary
-
-### Files to Modify
-1. `src/pages/TaskBoard.tsx` -- Race condition fix, empty states per column, form validation, skeleton loader
-2. `src/pages/Pipeline.tsx` -- Phone validation, form error messages, skeleton loader
-3. `src/pages/NurtureEngine.tsx` -- Stop switch logic in handleReplied/handleInterestedCall, empty states for tabs, skeleton loader
-4. `src/pages/Dashboard.tsx` -- Empty state for pipeline chart, skeleton loader for stat cards and charts
-5. `src/pages/Contacts.tsx` -- Skeleton loader for table
-6. `src/pages/Companies.tsx` -- Skeleton loader for table
-
-### No Database Changes Needed
-All fixes are client-side logic and UI improvements.
