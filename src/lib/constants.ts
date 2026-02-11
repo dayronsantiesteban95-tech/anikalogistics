@@ -10,10 +10,12 @@ export const TEAM_MEMBERS = [
 
 export const LEAD_STAGES = [
   { value: "new_lead", label: "New Lead" },
-  { value: "first_contact", label: "First Contact" },
-  { value: "quote_sent", label: "Quote Sent" },
-  { value: "negotiation", label: "Negotiation" },
-  { value: "account_won", label: "Account Won" },
+  { value: "qualified", label: "Qualified / Needs Analysis" },
+  { value: "quote_sent", label: "Quote Sent / Proposal" },
+  { value: "operational_review", label: "Operational Review" },
+  { value: "trial_run", label: "Trial Run / Pilot" },
+  { value: "account_active", label: "Account Active" },
+  { value: "retention", label: "Retention / Check-in" },
 ] as const;
 
 export const TASK_PRIORITIES = [
