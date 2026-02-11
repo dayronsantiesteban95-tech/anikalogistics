@@ -397,11 +397,28 @@ export default function NurtureEngine() {
   };
 
   const handleInterestedCall = async (step: SequenceStep, note?: string) => {
+    // Update sequence status
     await supabase.from("lead_sequences").update({
       response_status: "interested_call",
+      status: "completed",
       ...(note ? { note } : {}),
     }).eq("id", step.id);
-    toast({ title: "Interested in Call", description: "Lead highlighted for call scheduling." });
+
+    // Auto-promote lead to "qualified" stage in the Growth Pipeline
+    const stepLabel = STEP_LABELS[step.step_type] || step.step_type;
+    await supabase.from("leads").update({
+      stage: "qualified" as any,
+    }).eq("id", step.lead_id);
+
+    // Log an interaction noting the promotion
+    await supabase.from("lead_interactions").insert({
+      lead_id: step.lead_id,
+      activity_type: "note",
+      note: `🟢 Auto-promoted to Qualified — replied "Interested" on ${stepLabel}. ${note || ""}`.trim(),
+      created_by: (await supabase.auth.getUser()).data.user?.id,
+    });
+
+    toast({ title: "Lead Promoted to Qualified! 🎉", description: "Lead moved to Growth Pipeline and flagged for call scheduling." });
     fetchFollowUps();
     fetchTracker();
     fetchAttention();
