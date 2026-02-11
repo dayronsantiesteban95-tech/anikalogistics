@@ -230,6 +230,7 @@ export type Database = {
           follow_up_date: string | null
           id: string
           lead_id: string
+          note: string | null
           response_status: string
           sent_at: string | null
           status: string
@@ -242,6 +243,7 @@ export type Database = {
           follow_up_date?: string | null
           id?: string
           lead_id: string
+          note?: string | null
           response_status?: string
           sent_at?: string | null
           status?: string
@@ -254,6 +256,7 @@ export type Database = {
           follow_up_date?: string | null
           id?: string
           lead_id?: string
+          note?: string | null
           response_status?: string
           sent_at?: string | null
           status?: string
@@ -334,6 +337,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      nurture_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
