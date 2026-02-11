@@ -163,9 +163,9 @@ export default function Pipeline() {
     fetchLastContacts();
   };
 
-  const handleDrop = async (stage: "new_lead" | "first_contact" | "quote_sent" | "negotiation" | "account_won") => {
+  const handleDrop = async (stage: string) => {
     if (!draggedId) return;
-    await supabase.from("leads").update({ stage }).eq("id", draggedId);
+    await supabase.from("leads").update({ stage: stage as any }).eq("id", draggedId);
     setDraggedId(null);
     fetchLeads();
   };
@@ -280,11 +280,11 @@ export default function Pipeline() {
       </div>
 
       {/* Kanban */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 min-h-[60vh]">
+      <div className="flex gap-4 min-h-[60vh] overflow-x-auto pb-4">
         {LEAD_STAGES.map((stage) => (
           <div
             key={stage.value}
-            className="bg-muted/50 rounded-xl p-3 flex flex-col"
+            className="bg-muted/50 rounded-xl p-3 flex flex-col min-w-[220px] flex-1"
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(stage.value)}
           >
