@@ -1,85 +1,103 @@
 
-# User Management & Role-Based Access Control
+
+# SOP Wiki + Nurture Engine Access + QA Review
 
 ## Overview
-Build a complete user management system where Owners can create and manage team members, assign roles (Owner/Dispatcher), and enforce strict visibility rules so dispatchers only see their own assigned work.
+Three changes: (1) make SOP Wiki fully editable by all users (owners and dispatchers), (2) make Nurture Engine accessible to everyone, and (3) fix any spelling/spacing issues across the app. Plus, recommendations for final touches.
 
 ---
 
-## Current State
+## 1. Make SOP Wiki Editable by Everyone
 
-- One user exists (Dayron Santiesteban, info@anikalogistics.com)
-- The `user_roles` table and `has_role()` function already exist but **no roles are assigned yet**
-- The `useUserRole` hook exists and is used in the Task Board for filtering
-- Signup is open on the Auth page (anyone can create an account)
-- Dashboard, Pipeline, and other pages show ALL data to everyone
+**File:** `src/pages/SopWiki.tsx`
 
----
+Currently, all create/edit/delete buttons are gated behind `isOwner`. We need to remove those guards so any authenticated user can:
+- Create new articles (the "New Article" button)
+- Edit articles (pencil icon in both cheatsheet and grid views)
+- Delete articles (trash icon, with confirmation)
 
-## What We'll Build
-
-### 1. Assign Existing User as Owner
-Insert Dayron's role as "owner" in the `user_roles` table so the system recognizes him as an admin immediately.
-
-### 2. Owner-Only "Team Management" Page
-A new `/team` page (visible only to Owners in the sidebar) where Owners can:
-- **Invite new users** by entering email, full name, and role (owner or dispatcher)
-- **View all team members** with their roles and status
-- **Change a user's role** (promote dispatcher to owner or vice versa)
-- **Remove users** from the team
-
-User creation will use a backend function that creates the account via the Admin API (service role) and assigns the role automatically.
-
-### 3. Disable Public Signup
-Remove the "Sign up" option from the Auth page. Only Owners can create new users through the Team Management page. This prevents unauthorized accounts.
-
-### 4. Role-Based Visibility Across All Pages
-
-| Page | Owner Sees | Dispatcher Sees |
-|------|-----------|-----------------|
-| Dashboard | All stats, all tasks, all activity | Only their assigned tasks, global lead stats |
-| Pipeline | All leads | All leads (sales is collaborative) |
-| Task Board | All tasks (already works) | Only their assigned tasks (already works) |
-| Calendar | All events/tasks | Only their own tasks |
-| Companies | All (shared CRM data) | All (shared CRM data) |
-| Contacts | All (shared CRM data) | All (shared CRM data) |
-| SOP Wiki | All articles | All articles (read-only, no create/edit) |
-| Nurture Engine | Full access | Read-only or hidden |
-| Team Management | Full access | Hidden from sidebar |
-
-### 5. Sidebar Conditional Navigation
-Hide "Team Management" and optionally "Nurture Engine" links for dispatchers.
-
-### 6. Backend Function for User Invites
-Create an Edge Function `invite-user` that:
-- Validates the caller is an Owner (JWT check + role check)
-- Creates the user via Supabase Admin API (`auth.admin.createUser`)
-- Inserts a row in `user_roles`
-- Sends an invite/password-reset email so the new user can set their password
+**Changes:**
+- Remove all `{isOwner && (...)}` wrappers around the "New Article" button (line 123), edit/delete buttons in cheatsheet view (line 187), grid view hover actions (line 217), and the view dialog edit/delete buttons (line 273)
+- The `useUserRole` import can be removed since it's no longer needed
+- RLS already allows any authenticated user to INSERT and allows creators OR owners to UPDATE/DELETE -- this is appropriate (users can edit/delete their own articles, owners can edit/delete any)
 
 ---
 
-## Technical Details
+## 2. Make Nurture Engine Visible and Usable by Everyone
 
-### New Files
-- `src/pages/TeamManagement.tsx` -- Owner-only page for managing users
-- `supabase/functions/invite-user/index.ts` -- Edge Function for secure user creation
+The sidebar already includes Nurture Engine in `mainNav` for all users, so it's already accessible. However, inside the Nurture Engine page, some features are owner-gated:
+- **Settings button** (line 728): Keep owner-only -- cadence settings are admin-level
+- **Template creation** (line 1026): Make available to everyone
+- **Template edit/delete** (line 1066): Make available to everyone
+
+**File:** `src/pages/NurtureEngine.tsx`
+- Remove `isOwner` guard from "New Template" button
+- Remove `isOwner` guard from template edit/delete actions
+- Update the empty-state text that says "Your team lead hasn't added templates yet" to a generic message
+- Keep settings (cadence days) as owner-only since those are admin-level configurations
+
+---
+
+## 3. Spelling, Spacing, and Copy Review
+
+After a thorough review of all page files, here are the issues found and fixes:
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `src/pages/Dashboard.tsx` line 133 | "vs last month" placeholder text with no actual comparison | Remove or change to a neutral label like "all time" |
+| `src/lib/constants.ts` line 5 | TEAM_MEMBERS constant is hardcoded and outdated (no longer used for role checks) | No code issue, but could be cleaned up |
+
+No spelling errors found in button labels, headings, or descriptions across Auth, Dashboard, Pipeline, TaskBoard, CalendarView, SopWiki, NurtureEngine, or TeamManagement pages. The copy is clean.
+
+---
+
+## 4. Functional Verification Notes
+
+Based on code review, here is the status of each module:
+
+**Task Board** -- Working correctly:
+- Dispatchers see only their assigned tasks (line 76: `if (!isOwner && t.assigned_to !== user?.id) return false`)
+- Drag-and-drop status changes work via RLS (creator, assignee, or owner can update)
+- Create, edit, delete all functional
+
+**Calendar** -- Working correctly:
+- Dispatchers see only their assigned tasks (line 33: `if (!isOwner) query = query.eq("assigned_to", user.id)`)
+
+**Dashboard** -- Working correctly:
+- Role-based filtering on tasks, activity, and task status charts
+
+**Nurture Engine** -- Working correctly:
+- All CRUD operations use authenticated user context
+- Email sending, sequence management, template library all functional
+
+**Pipeline** -- Working correctly:
+- All leads visible to everyone (collaborative sales tool)
+
+---
+
+## 5. Recommendations for Final Features
+
+Here are high-impact features that would make this internal app significantly more useful:
+
+1. **Notification System** -- Push/in-app notifications when a task is assigned to you, when a lead replies, or when a follow-up is due. Currently users have to manually check each page.
+
+2. **Activity Log / Audit Trail** -- A simple log showing who changed what and when (e.g., "Dayron moved Lead X to Qualified at 3:15 PM"). Helpful for accountability in a team environment.
+
+3. **User Profile Page** -- Let team members update their name, avatar, and contact preferences. Currently profiles are bare-bones.
+
+4. **Mobile-Responsive Polish** -- The sidebar and task board columns could use mobile breakpoint adjustments for dispatchers who work on phones/tablets in the field.
+
+5. **Dashboard KPI Trends** -- The "vs last month" placeholder on stat cards could show actual month-over-month comparisons using historical data.
+
+---
+
+## Technical Summary
 
 ### Files to Modify
-- `src/components/AppSidebar.tsx` -- Add Team Management link (owner-only), hide items for dispatchers
-- `src/App.tsx` -- Add `/team` route
-- `src/pages/Auth.tsx` -- Remove signup toggle, login-only
-- `src/pages/Dashboard.tsx` -- Filter tasks/activity by role
-- `src/pages/CalendarView.tsx` -- Filter by assigned_to for dispatchers
-- `src/pages/SopWiki.tsx` -- Hide create/edit for dispatchers
-- `src/pages/NurtureEngine.tsx` -- Restrict access for dispatchers
+- `src/pages/SopWiki.tsx` -- Remove `isOwner` guards from all CRUD buttons
+- `src/pages/NurtureEngine.tsx` -- Remove `isOwner` guards from template CRUD buttons
+- `src/pages/Dashboard.tsx` -- Clean up "vs last month" placeholder text
 
-### Database Changes
-- INSERT Dayron's owner role into `user_roles`
-- No schema changes needed (tables already exist)
+### No Database Changes Needed
+RLS policies already support the desired access patterns.
 
-### Security Model
-- User creation goes through a secure Edge Function (service role, JWT-validated)
-- Role checks use the existing `has_role()` security definer function
-- RLS policies already enforce ownership rules on data mutations
-- Frontend hides UI elements based on role, but backend enforces the real rules
