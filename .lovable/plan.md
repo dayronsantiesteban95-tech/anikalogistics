@@ -1,79 +1,85 @@
 
-
-# Security Hardening Plan
+# User Management & Role-Based Access Control
 
 ## Overview
-Fix critical security vulnerabilities: add JWT validation to the AI chat function, tighten RLS policies across all tables using role-based access, and enable leaked password protection.
+Build a complete user management system where Owners can create and manage team members, assign roles (Owner/Dispatcher), and enforce strict visibility rules so dispatchers only see their own assigned work.
 
 ---
 
-## 1. Fix AI Chat Edge Function (Critical)
+## Current State
 
-**File:** `supabase/functions/ai-chat/index.ts`
-
-- Add JWT validation using `getClaims()` before processing any request
-- Use the authenticated user's client (with anon key + auth header) instead of the service role key for data queries, so RLS policies are respected
-- Return 401 for unauthenticated requests
-
----
-
-## 2. Tighten RLS Policies (Critical)
-
-Replace all `USING (true)` UPDATE/DELETE policies with ownership or role-based checks. The approach uses the existing `has_role()` function and `created_by` columns.
-
-### Policy Strategy
-
-Since this is a team CRM where collaboration is needed, the approach will be:
-- **SELECT**: Keep `USING (true)` for most tables (team needs shared visibility)
-- **INSERT**: Keep `auth.uid() = created_by` (already correct)
-- **UPDATE**: Allow creator OR owner role: `(auth.uid() = created_by) OR has_role(auth.uid(), 'owner')`
-- **DELETE**: Allow creator OR owner role: `(auth.uid() = created_by) OR has_role(auth.uid(), 'owner')`
-
-### Tables to Update
-
-| Table | UPDATE Policy | DELETE Policy |
-|-------|--------------|---------------|
-| companies | creator OR owner | creator OR owner |
-| contacts | creator OR owner | creator OR owner |
-| leads | creator OR owner | creator OR owner |
-| lead_interactions | creator OR owner | creator OR owner |
-| lead_sequences | creator OR owner | creator OR owner |
-| email_templates | creator OR owner | creator OR owner |
-| sop_articles | creator OR owner | creator OR owner |
-| tasks | creator OR assigned_to OR owner | creator OR owner |
-| task_lead_links | owner only | owner only |
-
-### Migration SQL (single migration)
-
-For each table, the migration will:
-1. DROP the existing permissive UPDATE/DELETE policies
-2. CREATE new policies with proper ownership + role checks
-3. Make `created_by` columns NOT NULL with DEFAULT `auth.uid()` where safe
+- One user exists (Dayron Santiesteban, info@anikalogistics.com)
+- The `user_roles` table and `has_role()` function already exist but **no roles are assigned yet**
+- The `useUserRole` hook exists and is used in the Task Board for filtering
+- Signup is open on the Auth page (anyone can create an account)
+- Dashboard, Pipeline, and other pages show ALL data to everyone
 
 ---
 
-## 3. Enable Leaked Password Protection
+## What We'll Build
 
-Use the configure-auth tool to enable leaked password protection, which checks passwords against known breach databases during signup and login.
+### 1. Assign Existing User as Owner
+Insert Dayron's role as "owner" in the `user_roles` table so the system recognizes him as an admin immediately.
 
----
+### 2. Owner-Only "Team Management" Page
+A new `/team` page (visible only to Owners in the sidebar) where Owners can:
+- **Invite new users** by entering email, full name, and role (owner or dispatcher)
+- **View all team members** with their roles and status
+- **Change a user's role** (promote dispatcher to owner or vice versa)
+- **Remove users** from the team
 
-## 4. Make `created_by` Columns NOT NULL
+User creation will use a backend function that creates the account via the Admin API (service role) and assigns the role automatically.
 
-For tables where `created_by` is nullable, alter them to have a default of `auth.uid()` and set NOT NULL (after backfilling any existing NULL values with a placeholder or the first owner user).
+### 3. Disable Public Signup
+Remove the "Sign up" option from the Auth page. Only Owners can create new users through the Team Management page. This prevents unauthorized accounts.
+
+### 4. Role-Based Visibility Across All Pages
+
+| Page | Owner Sees | Dispatcher Sees |
+|------|-----------|-----------------|
+| Dashboard | All stats, all tasks, all activity | Only their assigned tasks, global lead stats |
+| Pipeline | All leads | All leads (sales is collaborative) |
+| Task Board | All tasks (already works) | Only their assigned tasks (already works) |
+| Calendar | All events/tasks | Only their own tasks |
+| Companies | All (shared CRM data) | All (shared CRM data) |
+| Contacts | All (shared CRM data) | All (shared CRM data) |
+| SOP Wiki | All articles | All articles (read-only, no create/edit) |
+| Nurture Engine | Full access | Read-only or hidden |
+| Team Management | Full access | Hidden from sidebar |
+
+### 5. Sidebar Conditional Navigation
+Hide "Team Management" and optionally "Nurture Engine" links for dispatchers.
+
+### 6. Backend Function for User Invites
+Create an Edge Function `invite-user` that:
+- Validates the caller is an Owner (JWT check + role check)
+- Creates the user via Supabase Admin API (`auth.admin.createUser`)
+- Inserts a row in `user_roles`
+- Sends an invite/password-reset email so the new user can set their password
 
 ---
 
 ## Technical Details
 
+### New Files
+- `src/pages/TeamManagement.tsx` -- Owner-only page for managing users
+- `supabase/functions/invite-user/index.ts` -- Edge Function for secure user creation
+
 ### Files to Modify
-- `supabase/functions/ai-chat/index.ts` -- add JWT validation, switch from service role key to user-scoped client
+- `src/components/AppSidebar.tsx` -- Add Team Management link (owner-only), hide items for dispatchers
+- `src/App.tsx` -- Add `/team` route
+- `src/pages/Auth.tsx` -- Remove signup toggle, login-only
+- `src/pages/Dashboard.tsx` -- Filter tasks/activity by role
+- `src/pages/CalendarView.tsx` -- Filter by assigned_to for dispatchers
+- `src/pages/SopWiki.tsx` -- Hide create/edit for dispatchers
+- `src/pages/NurtureEngine.tsx` -- Restrict access for dispatchers
 
-### Database Migration
-Single migration covering:
-- ~18 policy DROP + CREATE statements across 9 tables
-- ALTER COLUMN statements for `created_by` defaults
+### Database Changes
+- INSERT Dayron's owner role into `user_roles`
+- No schema changes needed (tables already exist)
 
-### No Frontend Changes Required
-All fixes are backend-only. The frontend already sends the auth token in requests.
-
+### Security Model
+- User creation goes through a secure Edge Function (service role, JWT-validated)
+- Role checks use the existing `has_role()` security definer function
+- RLS policies already enforce ownership rules on data mutations
+- Frontend hides UI elements based on role, but backend enforces the real rules
