@@ -130,7 +130,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
                   <p className="text-2xl font-bold mt-1">{s.value}</p>
-                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">vs last month</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">all time</p>
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-muted/60 flex items-center justify-center">
                   <s.icon className={`h-5 w-5 ${s.color}`} />
