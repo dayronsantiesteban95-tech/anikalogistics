@@ -1,56 +1,99 @@
 
 
-## SOP Wiki -- Cheat Sheet Mode Redesign
+## Sales Nurture Engine
 
-Make the SOP Wiki more user-friendly by adding a "Cheat Sheet" inline reading experience so dispatchers can quickly scan procedures without opening dialogs.
-
----
-
-### What Changes
-
-**1. Replace "click-to-open-dialog" with inline expandable cards (Accordion style)**
-
-Instead of clicking a card and reading content in a popup dialog, each article becomes an expandable accordion card. Click the title and the full content unfolds right there -- like a cheat sheet you can scan up and down.
-
-**2. Two view modes: Grid View and Cheat Sheet View**
-
-- **Grid View** (current) -- compact cards for browsing, good when you have many articles
-- **Cheat Sheet View** (new default) -- a single-column list of expandable accordion cards grouped by category, so dispatchers see all relevant procedures at a glance
-
-A toggle button lets users switch between the two views.
-
-**3. Category sections in Cheat Sheet mode**
-
-In Cheat Sheet view, articles are grouped under category headers (General, Last-Mile, Hotshot, Onboarding). Each category is a collapsible section. When a category filter is active, only that category shows -- acting like a focused cheat sheet for that topic.
-
-**4. Search highlights matches in content too**
-
-Currently search only filters by title. Update it to also search within content text, so dispatchers can type "after 5 PM" and find the relevant hotshot procedure even if the title doesn't mention it.
-
-**5. Better empty state with quick-start suggestions**
-
-When no articles exist, show helpful prompts like "Start by adding your first Last-Mile procedure" with category-specific quick-create buttons.
-
-**6. Keep the View Dialog for Grid mode only**
-
-The existing click-to-view dialog stays for Grid mode. In Cheat Sheet mode, content is inline so no dialog is needed.
+Add a dedicated "Nurture" page to the CRM that manages pre-qualification outreach with sequence tracking, decision-tree logic, a template library, and a "follow-up today" view.
 
 ---
 
-### Technical Details
+### Overview
 
-**File modified:** `src/pages/SopWiki.tsx`
+The Nurture Engine is a new page accessible from the sidebar under "Operations." It has **3 tabs**:
 
-**Changes:**
+1. **Follow-Up Today** (default) -- shows all leads needing action today based on their sequence follow-up dates
+2. **Sequence Tracker** -- per-lead view of outreach steps (Email 1, Email 2, Call) with bifurcation actions
+3. **Template Library** -- pre-written emails organized by Hub (Miami, Phoenix, LA) that dispatchers can copy/paste
 
-| Area | Details |
+---
+
+### Database Changes
+
+**Add a `response_status` column to `lead_sequences`** to support bifurcation logic:
+
+```text
+ALTER TABLE lead_sequences ADD COLUMN response_status text DEFAULT 'no_response';
+-- Values: 'no_response', 'replied', 'interested_call'
+```
+
+No other table changes needed. The existing `lead_sequences` table already has `step_type`, `status`, `sent_at`, and `follow_up_date`. The existing `email_templates` table already has `name`, `hub`, `step_type`, `subject`, and `body`.
+
+---
+
+### New Page: `src/pages/NurtureEngine.tsx`
+
+**Tab 1: Follow-Up Today**
+- Query `lead_sequences` where `follow_up_date <= today` and `status = 'pending'`
+- Join with `leads` to show company name, contact person, hub, industry
+- Each row shows: lead name, step type (Email 1 / Email 2 / Call), days overdue
+- Leads with `response_status = 'interested_call'` get a green highlight
+- Click a lead to open inline action panel
+
+**Tab 2: Sequence Tracker**
+- Shows all leads in `new_lead` stage with their outreach sequence
+- Each lead row expands to show a timeline: Email 1 -> Email 2 -> Call
+- Each step shows status (pending / sent / skipped) with sent date
+- **Bifurcation Actions** on each step (3 buttons):
+  - "No Response" -- sets `follow_up_date` to 3 days from now, keeps status pending
+  - "Replied" -- moves lead stage to `qualified`, creates a task "Call [company]" assigned to dispatcher, shows toast alert
+  - "Interested in Call" -- sets `response_status = 'interested_call'`, highlights lead green in all views
+- Button to "Start Sequence" for a lead (creates Email 1, Email 2, Call steps with staggered follow-up dates)
+
+**Tab 3: Template Library**
+- Grid of template cards grouped by Hub (Miami / Phoenix / LA tabs or filter)
+- Each card shows: template name, step type badge, subject line preview
+- Click to expand and see full body with a "Copy to Clipboard" button
+- Owners can add/edit/delete templates; dispatchers can only view and copy
+- "New Template" form: name, hub selector, step type (email_1, email_2, call_script), subject, body
+
+---
+
+### Bifurcation Logic Detail
+
+When a dispatcher acts on a sequence step:
+
+| Response | Action |
 |---|---|
-| State | Add `viewMode` state: `"cheatsheet"` (default) or `"grid"` |
-| Search | Update filter to also match `article.content.toLowerCase()` |
-| Cheat Sheet view | Use Radix Accordion (`@radix-ui/react-accordion`, already installed) to render articles as expandable items grouped by category |
-| Category grouping | Group filtered articles by `article.category`, render each group under a heading |
-| View toggle | Add a small toggle button group (List icon / Grid icon) next to the search bar |
-| Styling | Each accordion item shows title + category badge when collapsed; expands to show full content with edit/delete buttons inline |
-| Grid view | Keeps existing card grid with click-to-view dialog behavior |
+| No Response | Set `follow_up_date = today + 3 days`, keep `status = 'pending'` |
+| Replied | Update lead `stage = 'qualified'`, create task "Call [company] - they replied!", mark sequence step `status = 'completed'` |
+| Interested in Call | Set `response_status = 'interested_call'`, sequence step stays active, lead card gets green border everywhere |
 
-**No database changes needed.** All changes are UI-only within `SopWiki.tsx`.
+---
+
+### Routing and Navigation
+
+- New route: `/nurture` in `App.tsx`
+- New sidebar item: "Nurture Engine" with `Zap` icon, added under "Operations" group in `AppSidebar.tsx`
+
+---
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `supabase/migrations/...` | Add `response_status` column to `lead_sequences` |
+| `src/pages/NurtureEngine.tsx` | New page with 3 tabs |
+| `src/App.tsx` | Add `/nurture` route |
+| `src/components/AppSidebar.tsx` | Add "Nurture Engine" nav item |
+| `src/pages/Pipeline.tsx` | Add green border for leads with `interested_call` status (query `lead_sequences` for the flag) |
+
+---
+
+### Technical Notes
+
+- The `lead_sequences` table already supports `step_type` as free text; we'll use values like `email_1`, `email_2`, `call`
+- The `email_templates` table already has `hub` and `step_type` columns -- perfect fit
+- "Start Sequence" auto-creates 3 rows in `lead_sequences`: email_1 (today), email_2 (today+3), call (today+7)
+- The "Follow-Up Today" query uses `follow_up_date <= CURRENT_DATE` to catch overdue items too
+- Copy-to-clipboard uses the browser `navigator.clipboard.writeText()` API
+- Green highlight uses Tailwind `border-l-green-500` class conditionally
+
