@@ -382,6 +382,11 @@ export default function NurtureEngine() {
       response_status: "replied",
       ...(note ? { note } : {}),
     }).eq("id", step.id);
+    // Stop all other pending/paused steps for this lead
+    await supabase.from("lead_sequences").update({
+      status: "completed",
+      response_status: "stopped",
+    }).eq("lead_id", step.lead_id).in("status", ["pending", "paused"]).neq("id", step.id);
     await supabase.from("leads").update({ stage: "qualified" as any }).eq("id", step.lead_id);
     const lead = followUpLeads[step.lead_id] || trackerLeads.find((l) => l.id === step.lead_id);
     await supabase.from("tasks").insert({
@@ -404,6 +409,11 @@ export default function NurtureEngine() {
       status: "completed",
       ...(note ? { note } : {}),
     }).eq("id", step.id);
+    // Stop all other pending/paused steps for this lead
+    await supabase.from("lead_sequences").update({
+      status: "completed",
+      response_status: "stopped",
+    }).eq("lead_id", step.lead_id).in("status", ["pending", "paused"]).neq("id", step.id);
 
     // Auto-promote lead to "qualified" stage in the Growth Pipeline
     const stepLabel = STEP_LABELS[step.step_type] || step.step_type;

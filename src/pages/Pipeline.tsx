@@ -27,6 +27,7 @@ import {
   Plus, Phone, Mail, MapPin, Package, AlertTriangle, MessageSquare,
   Pencil, Trash2, Search, Users, Crosshair, CalendarIcon, Truck,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -114,12 +115,15 @@ export default function Pipeline() {
   const [industryFilter, setIndustryFilter] = useState<string>("all");
   const [lastContactMap, setLastContactMap] = useState<Record<string, string>>({});
   const [nextActionDate, setNextActionDate] = useState<Date | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const { user } = useAuth();
   const { toast } = useToast();
 
   const fetchLeads = useCallback(async () => {
     const { data } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
     if (data) setLeads(data as Lead[]);
+    setLoading(false);
   }, []);
 
   const fetchLastContacts = useCallback(async () => {
@@ -200,15 +204,36 @@ export default function Pipeline() {
     }
   }, [showAdd, editLead]);
 
+  const PHONE_REGEX = /^[+]?[\d\s()-]*$/;
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) return;
     const fd = new FormData(e.currentTarget);
+
+    // Validate
+    const errors: Record<string, string> = {};
+    const companyName = (fd.get("company_name") as string || "").trim();
+    const contactPerson = (fd.get("contact_person") as string || "").trim();
+    const phone = (fd.get("phone") as string || "").trim();
+    const email = (fd.get("email") as string || "").trim();
+
+    if (!companyName) errors.company_name = "Company name is required";
+    if (!contactPerson) errors.contact_person = "Contact person is required";
+    if (phone && !PHONE_REGEX.test(phone)) errors.phone = "Invalid phone number";
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Invalid email address";
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+
     const payload: any = {
-      company_name: fd.get("company_name") as string,
-      contact_person: fd.get("contact_person") as string,
-      phone: fd.get("phone") as string || null,
-      email: fd.get("email") as string || null,
+      company_name: companyName,
+      contact_person: contactPerson,
+      phone: phone || null,
+      email: email || null,
       estimated_monthly_loads: Number(fd.get("loads")) || null,
       next_action_date: nextActionDate ? format(nextActionDate, "yyyy-MM-dd") : null,
       city_hub: fd.get("city_hub") as string || null,
@@ -253,6 +278,31 @@ export default function Pipeline() {
   });
 
   const isFormOpen = showAdd || !!editLead;
+
+  // Skeleton loading
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64 mt-2" />
+          </div>
+          <Skeleton className="h-10 w-28" />
+        </div>
+        <div className="flex gap-4 min-h-[60vh] overflow-x-auto pb-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-muted/40 rounded-2xl p-3 min-w-[230px] flex-1 space-y-3">
+              <Skeleton className="h-5 w-24" />
+              {Array.from({ length: 3 }).map((_, j) => (
+                <Skeleton key={j} className="h-28 w-full rounded-xl" />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const isGhosting = (leadId: string) => {
     const days = getDaysSinceContact(leadId, lastContactMap);
@@ -415,7 +465,7 @@ export default function Pipeline() {
       </div>
 
       {/* Add/Edit Lead Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={() => { setShowAdd(false); setEditLead(null); }}>
+      <Dialog open={isFormOpen} onOpenChange={() => { setShowAdd(false); setEditLead(null); setFormErrors({}); }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editLead ? "Edit Lead" : "Add New Lead"}</DialogTitle>
@@ -426,10 +476,26 @@ export default function Pipeline() {
             <div>
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Contact Information</h4>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Company Name *</Label><Input name="company_name" defaultValue={editLead?.company_name ?? ""} required /></div>
-                <div><Label>Contact Person *</Label><Input name="contact_person" defaultValue={editLead?.contact_person ?? ""} required /></div>
-                <div><Label>Phone</Label><Input name="phone" defaultValue={editLead?.phone ?? ""} /></div>
-                <div><Label>Email</Label><Input name="email" type="email" defaultValue={editLead?.email ?? ""} /></div>
+                <div>
+                  <Label>Company Name *</Label>
+                  <Input name="company_name" defaultValue={editLead?.company_name ?? ""} required />
+                  {formErrors.company_name && <p className="text-xs text-destructive mt-1">{formErrors.company_name}</p>}
+                </div>
+                <div>
+                  <Label>Contact Person *</Label>
+                  <Input name="contact_person" defaultValue={editLead?.contact_person ?? ""} required />
+                  {formErrors.contact_person && <p className="text-xs text-destructive mt-1">{formErrors.contact_person}</p>}
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input name="phone" defaultValue={editLead?.phone ?? ""} />
+                  {formErrors.phone && <p className="text-xs text-destructive mt-1">{formErrors.phone}</p>}
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input name="email" type="email" defaultValue={editLead?.email ?? ""} />
+                  {formErrors.email && <p className="text-xs text-destructive mt-1">{formErrors.email}</p>}
+                </div>
               </div>
             </div>
 
