@@ -278,6 +278,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          avg_packages_day: number | null
           city_hub: string | null
           company_id: string | null
           company_name: string
@@ -285,6 +286,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           delivery_points: string | null
+          delivery_radius_miles: number | null
           email: string | null
           estimated_monthly_loads: number | null
           id: string
@@ -292,10 +294,14 @@ export type Database = {
           main_lanes: string | null
           next_action_date: string | null
           phone: string | null
+          service_type: string | null
+          sla_requirement: string | null
           stage: Database["public"]["Enums"]["lead_stage"]
           updated_at: string
+          vehicle_type: string | null
         }
         Insert: {
+          avg_packages_day?: number | null
           city_hub?: string | null
           company_id?: string | null
           company_name: string
@@ -303,6 +309,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           delivery_points?: string | null
+          delivery_radius_miles?: number | null
           email?: string | null
           estimated_monthly_loads?: number | null
           id?: string
@@ -310,10 +317,14 @@ export type Database = {
           main_lanes?: string | null
           next_action_date?: string | null
           phone?: string | null
+          service_type?: string | null
+          sla_requirement?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
           updated_at?: string
+          vehicle_type?: string | null
         }
         Update: {
+          avg_packages_day?: number | null
           city_hub?: string | null
           company_id?: string | null
           company_name?: string
@@ -321,6 +332,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           delivery_points?: string | null
+          delivery_radius_miles?: number | null
           email?: string | null
           estimated_monthly_loads?: number | null
           id?: string
@@ -328,8 +340,11 @@ export type Database = {
           main_lanes?: string | null
           next_action_date?: string | null
           phone?: string | null
+          service_type?: string | null
+          sla_requirement?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
           updated_at?: string
+          vehicle_type?: string | null
         }
         Relationships: [
           {

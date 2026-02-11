@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { TIMEZONES } from "@/lib/constants";
-import { Truck } from "lucide-react";
+import logoAzul from "@/assets/logo-azul.png";
 
 function formatTime(timezone: string) {
   return new Date().toLocaleTimeString("en-US", {
@@ -25,14 +25,9 @@ export function GlobalHeader() {
   }, []);
 
   return (
-    <header className="h-14 border-b bg-card/80 backdrop-blur-sm flex items-center justify-between px-6 shrink-0">
+    <header className="h-16 bg-card/90 backdrop-blur-sm flex items-center justify-between px-6 shrink-0 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-          <Truck className="h-4 w-4 text-primary-foreground" />
-        </div>
-        <span className="text-lg font-bold tracking-tight text-foreground">
-          Anika<span className="text-accent"> Logistics</span>
-        </span>
+        <img src={logoAzul} alt="Anika Logistics" className="h-9 w-auto object-contain" />
       </div>
       <div className="flex items-center gap-6">
         {times.map((tz) => (

@@ -63,7 +63,6 @@ export default function Dashboard() {
         .limit(8);
       if (activity) setRecentActivity(activity);
 
-      // Fetch upcoming tasks (overdue first, then nearest due, non-done, limit 5)
       const { data: tasks } = await supabase
         .from("tasks")
         .select("*")
@@ -73,7 +72,6 @@ export default function Dashboard() {
         .limit(5);
       if (tasks) setUpcomingTasks(tasks);
 
-      // Fetch all tasks for status counts
       const { data: allTasks } = await supabase.from("tasks").select("status");
       const statusCounts: Record<string, number> = {};
       TASK_STATUSES.forEach((s) => (statusCounts[s.value] = 0));
@@ -105,14 +103,17 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statCards.map((s) => (
-          <Card key={s.label} className="shadow-sm hover:shadow-md transition-shadow border-0 glass-card">
-            <CardContent className="pt-5 pb-4">
+          <Card key={s.label} className="shadow-sm border-0 glass-card rounded-2xl hover:scale-[1.03] transition-transform duration-300 cursor-default">
+            <CardContent className="pt-6 pb-5 px-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
-                  <p className="text-2xl font-bold mt-0.5">{s.value}</p>
+                  <p className="text-2xl font-bold mt-1">{s.value}</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">vs last month</p>
                 </div>
-                <s.icon className={`h-6 w-6 ${s.color} opacity-70`} />
+                <div className="h-10 w-10 rounded-xl bg-muted/60 flex items-center justify-center">
+                  <s.icon className={`h-5 w-5 ${s.color}`} />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -120,8 +121,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pipeline Chart */}
-        <Card className="shadow-sm border-0 glass-card">
+        <Card className="shadow-sm border-0 glass-card rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Pipeline Funnel</CardTitle>
           </CardHeader>
@@ -141,8 +141,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card className="shadow-sm border-0 glass-card">
+        <Card className="shadow-sm border-0 glass-card rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
           </CardHeader>
@@ -165,10 +164,8 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Task Overview Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Upcoming Tasks */}
-        <Card className="shadow-sm border-0 glass-card lg:col-span-2">
+        <Card className="shadow-sm border-0 glass-card rounded-2xl lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <CalendarClock className="h-4 w-4 text-muted-foreground" />
@@ -186,7 +183,7 @@ export default function Dashboard() {
                   <div
                     key={task.id}
                     onClick={() => navigate("/tasks")}
-                    className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-colors hover:bg-muted/50 ${isOverdue ? "bg-destructive/10 border border-destructive/20" : ""}`}
+                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all duration-200 hover:bg-muted/50 hover:translate-x-1 ${isOverdue ? "bg-destructive/10 border border-destructive/20" : ""}`}
                   >
                     <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${priorityDot(task.priority)}`} />
                     <div className="flex-1 min-w-0">
@@ -208,8 +205,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Task Status Donut */}
-        <Card className="shadow-sm border-0 glass-card">
+        <Card className="shadow-sm border-0 glass-card rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Task Status</CardTitle>
           </CardHeader>
@@ -247,3 +243,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

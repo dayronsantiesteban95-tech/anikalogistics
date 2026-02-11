@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { LEAD_STAGES, ACTIVITY_TYPES, CITY_HUBS, INDUSTRIES, ACTION_ZONE_CITIES } from "@/lib/constants";
+import { LEAD_STAGES, ACTIVITY_TYPES, CITY_HUBS, INDUSTRIES, ACTION_ZONE_CITIES, SERVICE_TYPES, VEHICLE_TYPES } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import {
   Plus, Phone, Mail, MapPin, Package, AlertTriangle, MessageSquare,
-  Pencil, Trash2, Search, Users, Crosshair,
+  Pencil, Trash2, Search, Users, Crosshair, CalendarIcon, Truck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +44,11 @@ type Lead = {
   city_hub: string | null;
   industry: string | null;
   delivery_points: string | null;
+  service_type: string | null;
+  avg_packages_day: number | null;
+  delivery_radius_miles: number | null;
+  vehicle_type: string | null;
+  sla_requirement: string | null;
 };
 
 type Interaction = {
@@ -58,11 +69,11 @@ const activityIcon = (type: string) => {
 
 const getIndustryInfo = (value: string | null) => INDUSTRIES.find((i) => i.value === value);
 const getCityLabel = (value: string | null) => CITY_HUBS.find((c) => c.value === value)?.label;
+const getServiceLabel = (value: string | null) => SERVICE_TYPES.find((s) => s.value === value)?.label;
 
 const checkActionZone = (deliveryPoints: string | null, cityHub: string | null): "in_zone" | "out_zone" | "no_data" => {
   if (!deliveryPoints) return "no_data";
   const text = deliveryPoints.toLowerCase();
-  // Check against all hubs, but prioritize the lead's own hub
   const hubsToCheck = cityHub ? [cityHub, ...Object.keys(ACTION_ZONE_CITIES).filter(h => h !== cityHub)] : Object.keys(ACTION_ZONE_CITIES);
   for (const hub of hubsToCheck) {
     const cities = ACTION_ZONE_CITIES[hub];
@@ -76,6 +87,17 @@ const getDaysSinceContact = (leadId: string, lastContactMap: Record<string, stri
   if (!last) return null;
   return Math.floor((Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24));
 };
+
+// Stage gradient colors from navy to orange
+const STAGE_TOP_COLORS = [
+  "hsl(213, 100%, 14%)",
+  "hsl(213, 80%, 25%)",
+  "hsl(213, 60%, 35%)",
+  "hsl(30, 60%, 45%)",
+  "hsl(30, 80%, 50%)",
+  "hsl(30, 100%, 50%)",
+  "hsl(30, 100%, 55%)",
+];
 
 export default function Pipeline() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -91,6 +113,7 @@ export default function Pipeline() {
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [industryFilter, setIndustryFilter] = useState<string>("all");
   const [lastContactMap, setLastContactMap] = useState<Record<string, string>>({});
+  const [nextActionDate, setNextActionDate] = useState<Date | undefined>(undefined);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -101,7 +124,6 @@ export default function Pipeline() {
 
   const fetchLastContacts = useCallback(async () => {
     const { data } = await supabase.rpc("get_last_contacts" as any).select("*");
-    // fallback: query directly
     if (!data) {
       const { data: interactions } = await supabase
         .from("lead_interactions")
@@ -170,6 +192,14 @@ export default function Pipeline() {
     fetchLeads();
   };
 
+  // Reset date picker when opening form
+  useEffect(() => {
+    if (showAdd) setNextActionDate(undefined);
+    if (editLead?.next_action_date) {
+      setNextActionDate(new Date(editLead.next_action_date + "T00:00:00"));
+    }
+  }, [showAdd, editLead]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) return;
@@ -179,12 +209,16 @@ export default function Pipeline() {
       contact_person: fd.get("contact_person") as string,
       phone: fd.get("phone") as string || null,
       email: fd.get("email") as string || null,
-      main_lanes: fd.get("main_lanes") as string || null,
       estimated_monthly_loads: Number(fd.get("loads")) || null,
-      next_action_date: fd.get("next_action") as string || null,
+      next_action_date: nextActionDate ? format(nextActionDate, "yyyy-MM-dd") : null,
       city_hub: fd.get("city_hub") as string || null,
       industry: fd.get("industry") as string || null,
       delivery_points: fd.get("delivery_points") as string || null,
+      service_type: fd.get("service_type") as string || null,
+      avg_packages_day: Number(fd.get("avg_packages_day")) || null,
+      delivery_radius_miles: Number(fd.get("delivery_radius_miles")) || null,
+      vehicle_type: fd.get("vehicle_type") as string || null,
+      sla_requirement: fd.get("sla_requirement") as string || null,
     };
 
     if (editLead) {
@@ -223,7 +257,6 @@ export default function Pipeline() {
   const isGhosting = (leadId: string) => {
     const days = getDaysSinceContact(leadId, lastContactMap);
     if (days === null) {
-      // No interactions at all — check if lead is older than 10 days
       const lead = leads.find(l => l.id === leadId);
       if (!lead) return false;
       const leadAge = Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24));
@@ -281,16 +314,23 @@ export default function Pipeline() {
 
       {/* Kanban */}
       <div className="flex gap-4 min-h-[60vh] overflow-x-auto pb-4">
-        {LEAD_STAGES.map((stage) => (
+        {LEAD_STAGES.map((stage, stageIdx) => (
           <div
             key={stage.value}
-            className="bg-muted/50 rounded-xl p-3 flex flex-col min-w-[220px] flex-1"
+            className="bg-muted/40 rounded-2xl p-3 flex flex-col min-w-[230px] flex-1 transition-colors"
+            style={{ borderTop: `3px solid ${STAGE_TOP_COLORS[stageIdx % STAGE_TOP_COLORS.length]}` }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(stage.value)}
           >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-muted-foreground">{stage.label}</h3>
-              <Badge variant="secondary" className="text-xs">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: STAGE_TOP_COLORS[stageIdx % STAGE_TOP_COLORS.length] }}
+                />
+                <h3 className="text-sm font-semibold text-foreground/80">{stage.label}</h3>
+              </div>
+              <Badge variant="secondary" className="text-xs rounded-full px-2">
                 {filtered.filter((l) => l.stage === stage.value).length}
               </Badge>
             </div>
@@ -301,11 +341,12 @@ export default function Pipeline() {
                   const ghosting = isGhosting(lead.id);
                   const industryInfo = getIndustryInfo(lead.industry);
                   const cityLabel = getCityLabel(lead.city_hub);
+                  const serviceLabel = getServiceLabel(lead.service_type);
                   return (
                     <Card
                       key={lead.id}
-                      className={`group cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 ${
-                        ghosting ? "border-l-[#FF6700] animate-[shake_0.5s_ease-in-out_infinite]" : "border-l-accent/50"
+                      className={`group cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-l-4 rounded-xl ${
+                        ghosting ? "border-l-accent animate-[shake_0.5s_ease-in-out_infinite]" : "border-l-accent/30"
                       }`}
                       draggable
                       onDragStart={() => setDraggedId(lead.id)}
@@ -331,12 +372,12 @@ export default function Pipeline() {
                               {industryInfo.label}
                             </Badge>
                           )}
+                          {serviceLabel && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-accent/50 text-accent">
+                              <Truck className="h-2.5 w-2.5 mr-0.5" />{serviceLabel}
+                            </Badge>
+                          )}
                         </div>
-                        {lead.main_lanes && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3" /> {lead.main_lanes}
-                          </div>
-                        )}
                         {lead.estimated_monthly_loads && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Package className="h-3 w-3" /> {lead.estimated_monthly_loads} loads/mo
@@ -359,7 +400,7 @@ export default function Pipeline() {
                             );
                           })()}
                           {ghosting && (
-                            <Badge className="text-[10px] px-1.5 py-0 bg-[#FF6700] text-white">
+                            <Badge className="text-[10px] px-1.5 py-0 bg-accent text-accent-foreground">
                               ⚠ {ghostingDays(lead.id)}d no contact
                             </Badge>
                           )}
@@ -375,36 +416,101 @@ export default function Pipeline() {
 
       {/* Add/Edit Lead Dialog */}
       <Dialog open={isFormOpen} onOpenChange={() => { setShowAdd(false); setEditLead(null); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editLead ? "Edit Lead" : "Add New Lead"}</DialogTitle>
             <DialogDescription>{editLead ? "Update the lead details." : "Fill in the lead information."}</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Company Name *</Label><Input name="company_name" defaultValue={editLead?.company_name ?? ""} required /></div>
-              <div><Label>Contact Person *</Label><Input name="contact_person" defaultValue={editLead?.contact_person ?? ""} required /></div>
-              <div><Label>Phone</Label><Input name="phone" defaultValue={editLead?.phone ?? ""} /></div>
-              <div><Label>Email</Label><Input name="email" type="email" defaultValue={editLead?.email ?? ""} /></div>
-              <div><Label>Main Lanes</Label><Input name="main_lanes" defaultValue={editLead?.main_lanes ?? ""} placeholder="e.g. Miami to Dallas" /></div>
-              <div><Label>Est. Monthly Loads</Label><Input name="loads" type="number" defaultValue={editLead?.estimated_monthly_loads ?? ""} /></div>
-              <div>
-                <Label>City Hub</Label>
-                <select name="city_hub" defaultValue={editLead?.city_hub ?? ""} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="">None</option>
-                  {CITY_HUBS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <Label>Industry</Label>
-                <select name="industry" defaultValue={editLead?.industry ?? ""} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="">None</option>
-                  {INDUSTRIES.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
-                </select>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Contact Information */}
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Contact Information</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Company Name *</Label><Input name="company_name" defaultValue={editLead?.company_name ?? ""} required /></div>
+                <div><Label>Contact Person *</Label><Input name="contact_person" defaultValue={editLead?.contact_person ?? ""} required /></div>
+                <div><Label>Phone</Label><Input name="phone" defaultValue={editLead?.phone ?? ""} /></div>
+                <div><Label>Email</Label><Input name="email" type="email" defaultValue={editLead?.email ?? ""} /></div>
               </div>
             </div>
-            <div><Label>Next Action Date</Label><Input name="next_action" type="date" defaultValue={editLead?.next_action_date ?? ""} /></div>
-            <div><Label>Delivery Points</Label><Textarea name="delivery_points" defaultValue={editLead?.delivery_points ?? ""} placeholder="e.g. Fort Lauderdale, Orlando, Tampa" className="text-sm" /></div>
+
+            <div className="border-t border-border" />
+
+            {/* Delivery Metrics */}
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Delivery Metrics</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Service Type</Label>
+                  <select name="service_type" defaultValue={editLead?.service_type ?? ""} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">Select...</option>
+                    {SERVICE_TYPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div><Label>Avg. Packages/Day</Label><Input name="avg_packages_day" type="number" defaultValue={editLead?.avg_packages_day ?? ""} placeholder="e.g. 150" /></div>
+                <div><Label>Delivery Radius (miles)</Label><Input name="delivery_radius_miles" type="number" defaultValue={editLead?.delivery_radius_miles ?? ""} placeholder="e.g. 50" /></div>
+                <div>
+                  <Label>Vehicle Type Required</Label>
+                  <select name="vehicle_type" defaultValue={editLead?.vehicle_type ?? ""} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">Select...</option>
+                    {VEHICLE_TYPES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                  </select>
+                </div>
+                <div><Label>SLA Requirement</Label><Input name="sla_requirement" defaultValue={editLead?.sla_requirement ?? ""} placeholder="e.g. Same-day by 5pm" /></div>
+                <div><Label>Est. Monthly Loads</Label><Input name="loads" type="number" defaultValue={editLead?.estimated_monthly_loads ?? ""} /></div>
+              </div>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Location & Scheduling */}
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Location & Scheduling</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>City Hub</Label>
+                  <select name="city_hub" defaultValue={editLead?.city_hub ?? ""} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">None</option>
+                    {CITY_HUBS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Industry</Label>
+                  <select name="industry" defaultValue={editLead?.industry ?? ""} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">None</option>
+                    {INDUSTRIES.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3">
+                <Label>Next Action Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !nextActionDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {nextActionDate ? format(nextActionDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={nextActionDate}
+                      onSelect={setNextActionDate}
+                      disabled={(date) => date < new Date(new Date().toISOString().split("T")[0])}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="mt-3"><Label>Delivery Points</Label><Textarea name="delivery_points" defaultValue={editLead?.delivery_points ?? ""} placeholder="e.g. Fort Lauderdale, Orlando, Tampa" className="text-sm" /></div>
+            </div>
+
             <DialogFooter><Button type="submit">{editLead ? "Save Changes" : "Add Lead"}</Button></DialogFooter>
           </form>
         </DialogContent>
@@ -423,7 +529,6 @@ export default function Pipeline() {
                 <p><strong>Contact:</strong> {selectedLead.contact_person}</p>
                 {selectedLead.phone && <p className="flex items-center gap-2"><Phone className="h-3 w-3" /> {selectedLead.phone}</p>}
                 {selectedLead.email && <p className="flex items-center gap-2"><Mail className="h-3 w-3" /> {selectedLead.email}</p>}
-                {selectedLead.main_lanes && <p className="flex items-center gap-2"><MapPin className="h-3 w-3" /> {selectedLead.main_lanes}</p>}
                 <div className="flex flex-wrap gap-1">
                   {getCityLabel(selectedLead.city_hub) && <Badge variant="outline">{getCityLabel(selectedLead.city_hub)}</Badge>}
                   {getIndustryInfo(selectedLead.industry) && (
@@ -431,7 +536,15 @@ export default function Pipeline() {
                       {getIndustryInfo(selectedLead.industry)!.label}
                     </Badge>
                   )}
+                  {getServiceLabel(selectedLead.service_type) && (
+                    <Badge variant="outline" className="border-accent/50 text-accent">
+                      <Truck className="h-3 w-3 mr-1" />{getServiceLabel(selectedLead.service_type)}
+                    </Badge>
+                  )}
                 </div>
+                {selectedLead.avg_packages_day && <p><strong>Avg. Packages/Day:</strong> {selectedLead.avg_packages_day}</p>}
+                {selectedLead.delivery_radius_miles && <p><strong>Delivery Radius:</strong> {selectedLead.delivery_radius_miles} mi</p>}
+                {selectedLead.sla_requirement && <p><strong>SLA:</strong> {selectedLead.sla_requirement}</p>}
                 {selectedLead.delivery_points && (
                   <div className="flex items-center gap-2">
                     <Crosshair className="h-3 w-3" />
