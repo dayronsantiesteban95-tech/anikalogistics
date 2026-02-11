@@ -328,7 +328,12 @@ export default function TaskBoard() {
                             </Badge>
                           )}
                           {task.due_date && (
-                            <span className={`flex items-center gap-1 ${dueDateColor(task.due_date)}`}><Calendar className="h-3 w-3" /> {task.due_date}</span>
+                            <span className={`flex items-center gap-1 ${dueDateColor(task.due_date)}`}>
+                              {task.due_date < new Date().toISOString().split("T")[0] && (
+                                <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                              )}
+                              <Calendar className="h-3 w-3" /> {task.due_date}
+                            </span>
                           )}
                           {task.assigned_to && (
                             <span className="flex items-center gap-1"><User className="h-3 w-3" /> {getAssigneeName(task.assigned_to)}</span>
