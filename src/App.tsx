@@ -10,6 +10,8 @@ import Dashboard from "@/pages/Dashboard";
 import Pipeline from "@/pages/Pipeline";
 import TaskBoard from "@/pages/TaskBoard";
 import CalendarView from "@/pages/CalendarView";
+import Companies from "@/pages/Companies";
+import Contacts from "@/pages/Contacts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +52,8 @@ const App = () => (
             <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/tasks" element={<TaskBoard />} />
             <Route path="/calendar" element={<CalendarView />} />
+            <Route path="/companies" element={<Companies />} />
+            <Route path="/contacts" element={<Contacts />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Route>
           <Route path="*" element={<NotFound />} />
