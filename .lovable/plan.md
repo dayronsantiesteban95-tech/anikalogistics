@@ -1,100 +1,93 @@
 
 
-## Nurture Engine PRE Stage Enhancements
+## Anika Automated Outreach Engine Upgrade
 
-Upgrade the Nurture Engine so the PRE outreach stage has configurable timing, template integration per step, a visual bifurcation flow, and end-of-sequence handling.
+Evolve the existing Nurture Engine into a full "Anika Automated Outreach Engine" with auto-pilot tracking, a "Needs Attention" inbox, dynamic template variables, upgraded bifurcation actions, and a manual-mode toggle.
 
 ---
 
 ### What Changes
 
-**1. Configurable Sequence Cadence**
+**1. Rebrand and Restructure Tabs**
 
-Currently the timing is hardcoded (Email 1 = today, Email 2 = +3 days, Call = +7 days). Add a settings panel (owners only) where they can configure:
-- Days between Email 1 and Email 2 (default: 3)
-- Days between Email 2 and Call (default: 4)
-- Days for "No Response" snooze (default: 3)
+Rename the page header to "Anika Outreach Engine." Restructure the tabs to:
 
-These settings are stored in a new `nurture_settings` table so they persist across sessions.
+- **Sequences** (was "Sequence Tracker") -- shows leads on auto-pilot with a summary count header ("12 leads in Auto-Pilot")
+- **Needs Attention** (new) -- lists leads where `response_status = 'replied'` or `'interested_call'`. This is the salesperson's morning to-do list
+- **Follow-Up Today** (existing) -- unchanged functionality
+- **Template Library** (existing) -- upgraded with variable interpolation
 
-**2. Smart Template Suggestions on Each Step**
+**2. Manual Mode Toggle**
 
-When a dispatcher is working a sequence step, the system suggests the matching template based on the lead's hub and the step type. For example, if working Email 1 for a Miami lead, it automatically shows the Miami Email 1 template with a one-click "Copy" button -- no need to switch to the Template Library tab.
+Add a Switch toggle on each lead card in the Sequences tab. When toggled ON:
+- Sets a new `manual_mode` boolean column on `lead_sequences` to `true`
+- All pending sequence steps for that lead get status changed to "paused"
+- The lead card shows a "Manual" badge instead of the progress bar
+- When toggled OFF, steps resume as "pending"
 
-**3. Visual Bifurcation Decision Tree**
+This is the "Stop" trigger -- when a lead replies, the dispatcher clicks this toggle.
 
-Add a visual flow diagram at the top of the Sequence Tracker tab showing the decision paths:
+**3. Needs Attention View**
 
-```text
-[Email 1] --No Response--> [Email 2] --No Response--> [Call]
-    |                           |                        |
-  Replied                    Replied                  Replied
-    v                           v                        v
- QUALIFIED                  QUALIFIED                QUALIFIED
-    |                           |                        |
- Interested                Interested               Interested
-    v                           v                        v
- GREEN FLAG                GREEN FLAG               GREEN FLAG
-```
+A new tab that queries `lead_sequences` where `response_status IN ('replied', 'interested_call')` and shows:
+- Lead name, company, hub, industry
+- Which step triggered the reply
+- The dispatcher's note (if any)
+- Three action buttons (the new bifurcation set -- see below)
 
-This acts as a visual reference for dispatchers to understand the flow at a glance.
+**4. Upgraded Bifurcation Actions (3 Big Buttons)**
 
-**4. End-of-Sequence Handling**
+Replace the current 3 bifurcation buttons on the "Needs Attention" view with sales-focused actions:
 
-When all 3 steps are exhausted with "No Response," the lead currently just sits there. Add two options:
-- **"Restart Sequence"** -- creates a new 3-step cycle with fresh dates
-- **"Mark Cold"** -- moves the lead to a `cold` status and removes it from the tracker
+| Button | Action |
+|---|---|
+| "Interested - Schedule Call" | Move lead to `negotiation` stage, create task "Schedule call with [company]", mark sequence completed |
+| "Not Now - Nurture" | Set `follow_up_date` to +30 days, set `response_status = 'nurture_30d'`, keep lead in new_lead stage |
+| "Operational Review" | Move lead to `operational_review` stage, create task "Pre-flight checklist: docks/white-glove for [company]" |
 
-A "Cold Leads" section appears at the bottom of the Sequence Tracker for leads marked cold, with a "Revive" button.
+The original bifurcation buttons (No Response / Replied / Interested in Call) remain on the Sequence Tracker and Follow-Up Today tabs for step-level actions.
 
-**5. Step-Level Notes**
+**5. Dynamic Template Variables**
 
-Add a small text field on each bifurcation action so dispatchers can log a quick note (e.g., "Spoke with receptionist, call back Thursday"). This note gets saved to `lead_sequences` in a new `note` column.
+Upgrade the template body display and copy-to-clipboard to automatically replace placeholders:
+- `[Name]` replaced with `lead.contact_person`
+- `[Company]` replaced with `lead.company_name`
+- `[City Hub]` replaced with `lead.city_hub`
+- `[Industry]` replaced with `lead.industry`
 
-**6. Sequence Progress Bar**
+When a template suggestion appears inline on a sequence step, the variables are already filled in based on the lead's data before copying.
 
-Each lead card in the tracker shows a mini progress bar (3 segments) indicating how far through the sequence they are, color-coded: gray (pending), blue (in progress), green (completed).
+**6. Auto-Pilot Cadence Update**
+
+Change the default sequence timing to match the Anika methodology:
+- Day 1: Introduction email
+- Day 4: Social Proof email  
+- Day 8: Low Friction Offer email
+
+Update `nurture_settings` defaults: `email1_to_email2_days = 3` (Day 1 to Day 4), `email2_to_call_days = 4` (Day 4 to Day 8). These match the existing defaults, so no DB change needed -- just rename step labels:
+- `email_1` displays as "Day 1 - Introduction"
+- `email_2` displays as "Day 4 - Social Proof"  
+- `call` displays as "Day 8 - Low Friction Offer"
+
+**7. Sequence Progress Label**
+
+Enhance the existing `SequenceProgressBar` to show a text label like "2/3 sent" next to the colored segments.
+
+**8. Notification Badge**
+
+Add an orange notification dot on the "Nurture Engine" sidebar item when there are leads with `response_status = 'replied'` that haven't been actioned yet. This is queried on app load and stored in context/state. For now this is a polling check (every 60 seconds), mocked as the prompt suggests.
 
 ---
 
 ### Database Changes
 
-**New table: `nurture_settings`**
-
-| Column | Type | Default |
-|---|---|---|
-| id | uuid | gen_random_uuid() |
-| setting_key | text | (required) |
-| setting_value | text | (required) |
-| updated_by | uuid | nullable |
-| updated_at | timestamptz | now() |
-
-RLS: All authenticated can read; only owners can insert/update/delete.
-
-Default rows:
-- `email1_to_email2_days` = "3"
-- `email2_to_call_days` = "4"
-- `no_response_snooze_days` = "3"
-
 **Add column to `lead_sequences`:**
 
 ```text
-ALTER TABLE lead_sequences ADD COLUMN note text;
+ALTER TABLE lead_sequences ADD COLUMN manual_mode boolean NOT NULL DEFAULT false;
 ```
 
----
-
-### UI Changes in `NurtureEngine.tsx`
-
-| Area | Details |
-|---|---|
-| Settings gear icon | Opens a dialog for owners to edit cadence settings |
-| Sequence Tracker header | Visual decision-tree diagram rendered with styled divs (not an image) |
-| Each sequence step | Shows matching template suggestion (hub + step_type match) with Copy button inline |
-| Bifurcation buttons | Each button opens a small popover with optional note field before confirming |
-| End-of-sequence | Shows "Restart Sequence" and "Mark Cold" buttons when all steps are completed/exhausted |
-| Cold leads section | Collapsible section at bottom of tracker for leads marked cold |
-| Progress bar | 3-segment bar on each lead card header |
+No other schema changes needed. The `response_status` column already supports free-text values, so `'nurture_30d'` works without migration.
 
 ---
 
@@ -102,16 +95,18 @@ ALTER TABLE lead_sequences ADD COLUMN note text;
 
 | File | Change |
 |---|---|
-| `supabase/migrations/...` | Create `nurture_settings` table with RLS; add `note` column to `lead_sequences` |
-| `src/pages/NurtureEngine.tsx` | All UI enhancements: settings dialog, decision tree visual, template suggestions, note field on bifurcation, cold leads section, progress bar |
+| `supabase/migrations/...` | Add `manual_mode` column to `lead_sequences` |
+| `src/pages/NurtureEngine.tsx` | Rebrand header, add "Sequences" and "Needs Attention" tabs, manual mode toggle, dynamic template variables, upgraded bifurcation buttons, progress label, updated step labels |
+| `src/components/AppSidebar.tsx` | Add notification badge (orange dot) on Nurture Engine nav item with reply count polling |
 
 ---
 
 ### Technical Notes
 
-- Template suggestion query: match `email_templates` where `hub = lead.city_hub` and `step_type = step.step_type`
-- "Mark Cold" sets a special `response_status = 'cold'` on the lead's last sequence step and is used to filter them into the cold section
-- Settings are fetched once on page load and cached in state; changes take effect immediately
-- The visual decision tree is built with Tailwind flexbox/grid, not a charting library
-- No changes to routing or sidebar needed -- everything is within the existing Nurture Engine page
+- The manual mode toggle uses Supabase to bulk-update all pending steps for a lead: `UPDATE lead_sequences SET manual_mode = true, status = 'paused' WHERE lead_id = X AND status = 'pending'`
+- Dynamic variable replacement is a simple string `.replace()` at render/copy time -- no DB changes needed
+- The "Needs Attention" query: `SELECT * FROM lead_sequences WHERE response_status IN ('replied', 'interested_call') AND status != 'completed'` joined with leads
+- Notification badge polls `lead_sequences` count where `response_status = 'replied' AND status = 'pending'` every 60 seconds
+- The 3 new bifurcation buttons only appear in the "Needs Attention" tab; the original buttons stay on the other tabs
+- `nurture_30d` as a response_status value works with existing free-text column
 
