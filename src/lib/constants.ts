@@ -29,6 +29,20 @@ export const TASK_STATUSES = [
   { value: "done", label: "Done" },
 ] as const;
 
+export const DEPARTMENTS = [
+  { value: "onboarding", label: "Onboarding" },
+  { value: "operations", label: "Operations" },
+  { value: "prospecting", label: "Prospecting" },
+  { value: "clients", label: "Clients" },
+] as const;
+
+export const ACTIVITY_TYPES = [
+  { value: "note", label: "Note", icon: "MessageSquare" },
+  { value: "email", label: "Email", icon: "Mail" },
+  { value: "call", label: "Call", icon: "Phone" },
+  { value: "meeting", label: "Meeting", icon: "Users" },
+] as const;
+
 export const TIMEZONES = [
   { city: "Miami", timezone: "America/New_York", abbr: "EST" },
   { city: "Phoenix", timezone: "America/Phoenix", abbr: "MST" },

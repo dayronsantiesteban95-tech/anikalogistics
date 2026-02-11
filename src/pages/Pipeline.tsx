@@ -1,14 +1,26 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { LEAD_STAGES } from "@/lib/constants";
+import { LEAD_STAGES, ACTIVITY_TYPES } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Phone, Mail, MapPin, Package, AlertTriangle, MessageSquare } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Plus, Phone, Mail, MapPin, Package, AlertTriangle, MessageSquare,
+  Pencil, Trash2, Search, Users,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,16 +40,30 @@ type Lead = {
 type Interaction = {
   id: string;
   note: string;
+  activity_type: string;
   created_at: string;
+};
+
+const activityIcon = (type: string) => {
+  switch (type) {
+    case "email": return <Mail className="h-3 w-3 text-blue-500" />;
+    case "call": return <Phone className="h-3 w-3 text-green-500" />;
+    case "meeting": return <Users className="h-3 w-3 text-purple-500" />;
+    default: return <MessageSquare className="h-3 w-3 text-muted-foreground" />;
+  }
 };
 
 export default function Pipeline() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [editLead, setEditLead] = useState<Lead | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [newNote, setNewNote] = useState("");
+  const [activityType, setActivityType] = useState<string>("note");
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -48,7 +74,6 @@ export default function Pipeline() {
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
-  // Realtime
   useEffect(() => {
     const channel = supabase
       .channel("leads-realtime")
@@ -58,7 +83,11 @@ export default function Pipeline() {
   }, [fetchLeads]);
 
   const fetchInteractions = async (leadId: string) => {
-    const { data } = await supabase.from("lead_interactions").select("*").eq("lead_id", leadId).order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("lead_interactions")
+      .select("*")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false });
     if (data) setInteractions(data as Interaction[]);
   };
 
@@ -69,8 +98,15 @@ export default function Pipeline() {
 
   const addInteraction = async () => {
     if (!newNote.trim() || !selectedLead || !user) return;
-    await supabase.from("lead_interactions").insert({ lead_id: selectedLead.id, note: newNote, created_by: user.id });
+    const at = activityType as "note" | "email" | "call" | "meeting";
+    await supabase.from("lead_interactions").insert({
+      lead_id: selectedLead.id,
+      note: newNote,
+      activity_type: at,
+      created_by: user.id,
+    });
     setNewNote("");
+    setActivityType("note");
     fetchInteractions(selectedLead.id);
   };
 
@@ -81,11 +117,11 @@ export default function Pipeline() {
     fetchLeads();
   };
 
-  const handleAddLead = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) return;
     const fd = new FormData(e.currentTarget);
-    const { error } = await supabase.from("leads").insert({
+    const payload = {
       company_name: fd.get("company_name") as string,
       contact_person: fd.get("contact_person") as string,
       phone: fd.get("phone") as string || null,
@@ -93,20 +129,37 @@ export default function Pipeline() {
       main_lanes: fd.get("main_lanes") as string || null,
       estimated_monthly_loads: Number(fd.get("loads")) || null,
       next_action_date: fd.get("next_action") as string || null,
-      created_by: user.id,
-    });
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    };
+
+    if (editLead) {
+      const { error } = await supabase.from("leads").update(payload).eq("id", editLead.id);
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+      else { setEditLead(null); fetchLeads(); }
     } else {
-      setShowAdd(false);
-      fetchLeads();
+      const { error } = await supabase.from("leads").insert({ ...payload, created_by: user.id });
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+      else { setShowAdd(false); fetchLeads(); }
     }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    await supabase.from("leads").delete().eq("id", deleteId);
+    setDeleteId(null);
+    if (selectedLead?.id === deleteId) setSelectedLead(null);
+    fetchLeads();
   };
 
   const isOverdue = (date: string | null) => {
     if (!date) return false;
     return new Date(date) < new Date(new Date().toISOString().split("T")[0]);
   };
+
+  const filtered = leads.filter((l) =>
+    !search || l.company_name.toLowerCase().includes(search.toLowerCase()) || l.contact_person.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const isFormOpen = showAdd || !!editLead;
 
   return (
     <div className="space-y-4">
@@ -118,6 +171,11 @@ export default function Pipeline() {
         <Button onClick={() => setShowAdd(true)} className="gap-2">
           <Plus className="h-4 w-4" /> New Lead
         </Button>
+      </div>
+
+      <div className="relative w-64">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search leads..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
       </div>
 
       {/* Kanban */}
@@ -132,22 +190,32 @@ export default function Pipeline() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-muted-foreground">{stage.label}</h3>
               <Badge variant="secondary" className="text-xs">
-                {leads.filter((l) => l.stage === stage.value).length}
+                {filtered.filter((l) => l.stage === stage.value).length}
               </Badge>
             </div>
             <div className="space-y-2 flex-1">
-              {leads
+              {filtered
                 .filter((l) => l.stage === stage.value)
                 .map((lead) => (
                   <Card
                     key={lead.id}
-                    className="cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 border-l-accent/50"
+                    className="group cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 border-l-accent/50"
                     draggable
                     onDragStart={() => setDraggedId(lead.id)}
                     onClick={() => openLead(lead)}
                   >
                     <CardContent className="p-3 space-y-2">
-                      <p className="font-semibold text-sm leading-tight">{lead.company_name}</p>
+                      <div className="flex items-start justify-between">
+                        <p className="font-semibold text-sm leading-tight">{lead.company_name}</p>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); setEditLead(lead); }} className="p-1 rounded hover:bg-muted">
+                            <Pencil className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteId(lead.id); }} className="p-1 rounded hover:bg-destructive/10">
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </button>
+                        </div>
+                      </div>
                       <p className="text-xs text-muted-foreground">{lead.contact_person}</p>
                       {lead.main_lanes && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -173,32 +241,36 @@ export default function Pipeline() {
         ))}
       </div>
 
-      {/* Add Lead Dialog */}
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+      {/* Add/Edit Lead Dialog */}
+      <Dialog open={isFormOpen} onOpenChange={() => { setShowAdd(false); setEditLead(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
-          <form onSubmit={handleAddLead} className="space-y-3">
+          <DialogHeader>
+            <DialogTitle>{editLead ? "Edit Lead" : "Add New Lead"}</DialogTitle>
+            <DialogDescription>{editLead ? "Update the lead details." : "Fill in the lead information."}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Company Name *</Label><Input name="company_name" required /></div>
-              <div><Label>Contact Person *</Label><Input name="contact_person" required /></div>
-              <div><Label>Phone</Label><Input name="phone" /></div>
-              <div><Label>Email</Label><Input name="email" type="email" /></div>
-              <div><Label>Main Lanes</Label><Input name="main_lanes" placeholder="e.g. Miami to Dallas" /></div>
-              <div><Label>Est. Monthly Loads</Label><Input name="loads" type="number" /></div>
+              <div><Label>Company Name *</Label><Input name="company_name" defaultValue={editLead?.company_name ?? ""} required /></div>
+              <div><Label>Contact Person *</Label><Input name="contact_person" defaultValue={editLead?.contact_person ?? ""} required /></div>
+              <div><Label>Phone</Label><Input name="phone" defaultValue={editLead?.phone ?? ""} /></div>
+              <div><Label>Email</Label><Input name="email" type="email" defaultValue={editLead?.email ?? ""} /></div>
+              <div><Label>Main Lanes</Label><Input name="main_lanes" defaultValue={editLead?.main_lanes ?? ""} placeholder="e.g. Miami to Dallas" /></div>
+              <div><Label>Est. Monthly Loads</Label><Input name="loads" type="number" defaultValue={editLead?.estimated_monthly_loads ?? ""} /></div>
             </div>
-            <div><Label>Next Action Date</Label><Input name="next_action" type="date" /></div>
-            <DialogFooter><Button type="submit">Add Lead</Button></DialogFooter>
+            <div><Label>Next Action Date</Label><Input name="next_action" type="date" defaultValue={editLead?.next_action_date ?? ""} /></div>
+            <DialogFooter><Button type="submit">{editLead ? "Save Changes" : "Add Lead"}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* Lead Detail Dialog */}
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           {selectedLead && (
             <>
               <DialogHeader>
                 <DialogTitle>{selectedLead.company_name}</DialogTitle>
+                <DialogDescription>Lead details and interaction history</DialogDescription>
               </DialogHeader>
               <div className="space-y-2 text-sm">
                 <p><strong>Contact:</strong> {selectedLead.contact_person}</p>
@@ -208,18 +280,32 @@ export default function Pipeline() {
               </div>
 
               <div className="mt-4 space-y-3">
-                <h4 className="font-semibold text-sm flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Interaction Log</h4>
+                <h4 className="font-semibold text-sm flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Activity Log</h4>
                 <div className="flex gap-2">
-                  <Textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Log an interaction..." className="text-sm" />
-                  <Button onClick={addInteraction} size="sm" className="self-end">Add</Button>
+                  <Select value={activityType} onValueChange={setActivityType}>
+                    <SelectTrigger className="w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACTIVITY_TYPES.map((a) => (
+                        <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Log activity..." className="text-sm flex-1" />
+                  <Button onClick={addInteraction} size="sm" className="self-end">Log</Button>
                 </div>
                 <div className="max-h-48 overflow-y-auto space-y-2">
                   {interactions.map((i) => (
-                    <div key={i.id} className="bg-muted rounded-lg p-3 text-sm">
-                      <p>{i.note}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(i.created_at).toLocaleString()}
-                      </p>
+                    <div key={i.id} className="bg-muted rounded-lg p-3 text-sm flex gap-2">
+                      <div className="mt-0.5">{activityIcon(i.activity_type)}</div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">{i.activity_type}</Badge>
+                          <span className="text-xs text-muted-foreground">{new Date(i.created_at).toLocaleString()}</span>
+                        </div>
+                        <p>{i.note}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -228,6 +314,20 @@ export default function Pipeline() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete lead?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently remove the lead and all its interactions.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
