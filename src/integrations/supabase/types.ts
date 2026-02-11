@@ -19,7 +19,7 @@ export type Database = {
           address: string | null
           city: string | null
           created_at: string
-          created_by: string | null
+          created_by: string
           id: string
           industry: string | null
           name: string
@@ -33,7 +33,7 @@ export type Database = {
           address?: string | null
           city?: string | null
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           id?: string
           industry?: string | null
           name: string
@@ -47,7 +47,7 @@ export type Database = {
           address?: string | null
           city?: string | null
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           id?: string
           industry?: string | null
           name?: string
@@ -63,7 +63,7 @@ export type Database = {
         Row: {
           company_id: string | null
           created_at: string
-          created_by: string | null
+          created_by: string
           email: string | null
           first_name: string
           id: string
@@ -77,7 +77,7 @@ export type Database = {
         Insert: {
           company_id?: string | null
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           email?: string | null
           first_name: string
           id?: string
@@ -91,7 +91,7 @@ export type Database = {
         Update: {
           company_id?: string | null
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           email?: string | null
           first_name?: string
           id?: string
@@ -123,7 +123,7 @@ export type Database = {
         Row: {
           body: string
           created_at: string
-          created_by: string | null
+          created_by: string
           hub: string
           id: string
           name: string
@@ -134,7 +134,7 @@ export type Database = {
         Insert: {
           body: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           hub: string
           id?: string
           name: string
@@ -145,7 +145,7 @@ export type Database = {
         Update: {
           body?: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           hub?: string
           id?: string
           name?: string
@@ -192,7 +192,7 @@ export type Database = {
         Row: {
           activity_type: Database["public"]["Enums"]["activity_type"]
           created_at: string
-          created_by: string | null
+          created_by: string
           id: string
           lead_id: string
           note: string
@@ -200,7 +200,7 @@ export type Database = {
         Insert: {
           activity_type?: Database["public"]["Enums"]["activity_type"]
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           id?: string
           lead_id: string
           note: string
@@ -208,7 +208,7 @@ export type Database = {
         Update: {
           activity_type?: Database["public"]["Enums"]["activity_type"]
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           id?: string
           lead_id?: string
           note?: string
@@ -226,7 +226,7 @@ export type Database = {
       lead_sequences: {
         Row: {
           created_at: string
-          created_by: string | null
+          created_by: string
           follow_up_date: string | null
           id: string
           lead_id: string
@@ -240,7 +240,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           follow_up_date?: string | null
           id?: string
           lead_id: string
@@ -254,7 +254,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           follow_up_date?: string | null
           id?: string
           lead_id?: string
@@ -284,7 +284,7 @@ export type Database = {
           company_name: string
           contact_person: string
           created_at: string
-          created_by: string | null
+          created_by: string
           delivery_points: string | null
           delivery_radius_miles: number | null
           email: string | null
@@ -307,7 +307,7 @@ export type Database = {
           company_name: string
           contact_person: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           delivery_points?: string | null
           delivery_radius_miles?: number | null
           email?: string | null
@@ -330,7 +330,7 @@ export type Database = {
           company_name?: string
           contact_person?: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           delivery_points?: string | null
           delivery_radius_miles?: number | null
           email?: string | null
@@ -412,7 +412,7 @@ export type Database = {
           category: string
           content: string
           created_at: string
-          created_by: string | null
+          created_by: string
           id: string
           title: string
           updated_at: string
@@ -421,7 +421,7 @@ export type Database = {
           category?: string
           content: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           id?: string
           title: string
           updated_at?: string
@@ -430,7 +430,7 @@ export type Database = {
           category?: string
           content?: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           id?: string
           title?: string
           updated_at?: string
@@ -506,7 +506,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           created_at: string
-          created_by: string | null
+          created_by: string
           department: Database["public"]["Enums"]["department"] | null
           description: string | null
           due_date: string | null
@@ -519,7 +519,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           department?: Database["public"]["Enums"]["department"] | null
           description?: string | null
           due_date?: string | null
@@ -532,7 +532,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           department?: Database["public"]["Enums"]["department"] | null
           description?: string | null
           due_date?: string | null
