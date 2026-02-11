@@ -12,6 +12,7 @@ import TaskBoard from "@/pages/TaskBoard";
 import CalendarView from "@/pages/CalendarView";
 import Companies from "@/pages/Companies";
 import Contacts from "@/pages/Contacts";
+import SopWiki from "@/pages/SopWiki";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/calendar" element={<CalendarView />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/contacts" element={<Contacts />} />
+            <Route path="/sop-wiki" element={<SopWiki />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Route>
           <Route path="*" element={<NotFound />} />

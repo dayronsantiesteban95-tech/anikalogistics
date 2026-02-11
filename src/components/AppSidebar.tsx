@@ -8,6 +8,7 @@ import {
   Users,
   Moon,
   Sun,
+  BookOpen,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -36,6 +37,10 @@ const mainNav = [
 const crmNav = [
   { title: "Companies", url: "/companies", icon: Building2 },
   { title: "Contacts", url: "/contacts", icon: Users },
+];
+
+const resourcesNav = [
+  { title: "SOP Wiki", url: "/sop-wiki", icon: BookOpen },
 ];
 
 export function AppSidebar() {
@@ -88,6 +93,17 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {crmNav.map((item) => <NavItem key={item.title} item={item} />)}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/60 uppercase text-[10px] tracking-[0.15em] font-semibold mb-2">
+            Resources
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {resourcesNav.map((item) => <NavItem key={item.title} item={item} />)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

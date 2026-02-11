@@ -49,3 +49,30 @@ export const TIMEZONES = [
   { city: "Phoenix", timezone: "America/Phoenix", abbr: "MST" },
   { city: "Los Angeles", timezone: "America/Los_Angeles", abbr: "PST" },
 ] as const;
+
+export const CITY_HUBS = [
+  { value: "miami", label: "Miami" },
+  { value: "phoenix", label: "Phoenix" },
+  { value: "la", label: "Los Angeles" },
+] as const;
+
+export const INDUSTRIES = [
+  { value: "medical_pharma", label: "Medical/Pharma", color: "bg-blue-500" },
+  { value: "legal", label: "Legal", color: "bg-purple-500" },
+  { value: "auto_parts", label: "Auto Parts", color: "bg-amber-500" },
+  { value: "ecommerce_last_mile", label: "E-commerce/Last-Mile", color: "bg-emerald-500" },
+] as const;
+
+export const SOP_CATEGORIES = [
+  { value: "general", label: "General" },
+  { value: "last_mile", label: "Last-Mile" },
+  { value: "hotshot", label: "Hotshot" },
+  { value: "onboarding", label: "Onboarding" },
+] as const;
+
+// Cities within ~300 miles of each hub for radius validation
+export const ACTION_ZONE_CITIES: Record<string, string[]> = {
+  miami: ["miami", "fort lauderdale", "west palm beach", "orlando", "tampa", "naples", "key west", "jacksonville", "gainesville", "tallahassee", "sarasota", "st petersburg", "cape coral", "port st lucie", "daytona"],
+  phoenix: ["phoenix", "scottsdale", "tucson", "mesa", "tempe", "chandler", "flagstaff", "sedona", "yuma", "prescott", "las vegas", "henderson", "albuquerque"],
+  la: ["los angeles", "long beach", "anaheim", "santa ana", "riverside", "san bernardino", "ontario", "pasadena", "san diego", "bakersfield", "santa barbara", "palm springs", "ventura", "oxnard", "irvine"],
+};
