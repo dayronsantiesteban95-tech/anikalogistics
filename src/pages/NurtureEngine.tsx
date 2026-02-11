@@ -1023,11 +1023,9 @@ export default function NurtureEngine() {
                 <Button key={h} variant={hubFilter === h ? "default" : "outline"} size="sm" onClick={() => setHubFilter(h)}>{HUB_LABELS[h] || h}</Button>
               ))}
             </div>
-            {isOwner && (
-              <Button size="sm" onClick={() => { setEditTemplate(null); setShowTemplateForm(true); }} className="gap-1.5">
-                <Plus className="h-3.5 w-3.5" /> New Template
-              </Button>
-            )}
+            <Button size="sm" onClick={() => { setEditTemplate(null); setShowTemplateForm(true); }} className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" /> New Template
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
             Use <code className="bg-muted px-1 rounded">[Name]</code>, <code className="bg-muted px-1 rounded">[Company]</code>, <code className="bg-muted px-1 rounded">[City Hub]</code>, <code className="bg-muted px-1 rounded">[Industry]</code> as dynamic variables.
@@ -1038,7 +1036,7 @@ export default function NurtureEngine() {
               <Mail className="h-10 w-10 mx-auto mb-3" />
               <p className="font-medium">No templates yet</p>
               <p className="text-sm">
-                {isOwner ? "Create your first email template for your team." : "Your team lead hasn't added templates yet."}
+                Create your first email template to get started.
               </p>
             </CardContent></Card>
           ) : (
@@ -1063,16 +1061,12 @@ export default function NurtureEngine() {
                           <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); copyToClipboard(`Subject: ${t.subject}\n\n${t.body}`); }} className="gap-1.5">
                             <Copy className="h-3 w-3" /> Copy
                           </Button>
-                          {isOwner && (
-                            <>
-                              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditTemplate(t); setShowTemplateForm(true); }}>
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); deleteTemplate(t.id); }} className="text-destructive">
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </>
-                          )}
+                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditTemplate(t); setShowTemplateForm(true); }}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); deleteTemplate(t.id); }} className="text-destructive">
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
                     )}
