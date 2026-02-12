@@ -126,6 +126,36 @@ serve(async (req) => {
       });
     }
 
+    if (action === "reset_password") {
+      const targetEmail = email;
+      if (!targetEmail) {
+        return new Response(JSON.stringify({ error: "email is required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: resetData, error: resetError } = await adminClient.auth.admin.generateLink({
+        type: "recovery",
+        email: targetEmail,
+      });
+
+      if (resetError) {
+        return new Response(JSON.stringify({ error: resetError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          recovery_link: resetData?.properties?.action_link || null,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (action === "remove") {
       const userId = email; // reuse email field as user_id
       if (!userId) {
