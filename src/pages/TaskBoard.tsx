@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { TASK_STATUSES, TASK_PRIORITIES, DEPARTMENTS } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
@@ -179,9 +180,12 @@ export default function TaskBoard() {
 
   const dueDateColor = (date: string | null) => {
     if (!date) return "text-muted-foreground";
-    const today = new Date().toISOString().split("T")[0];
-    if (date < today) return "text-red-500 font-semibold";
-    if (date === today) return "text-amber-500 font-semibold";
+    const now = new Date();
+    const due = new Date(date);
+    if (due < now) return "text-red-500 font-semibold";
+    // Due within the next 24 hours
+    const diff = due.getTime() - now.getTime();
+    if (diff < 24 * 60 * 60 * 1000) return "text-amber-500 font-semibold";
     return "text-muted-foreground";
   };
 
@@ -329,10 +333,10 @@ export default function TaskBoard() {
                           )}
                           {task.due_date && (
                             <span className={`flex items-center gap-1 ${dueDateColor(task.due_date)}`}>
-                              {task.due_date <= new Date().toISOString().split("T")[0] && (
+                              {new Date(task.due_date) <= new Date() && (
                                 <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
                               )}
-                              <Calendar className="h-3 w-3" /> {task.due_date}
+                              <Calendar className="h-3 w-3" /> {format(new Date(task.due_date), "MMM d, h:mm a")}
                             </span>
                           )}
                           {task.assigned_to && (
@@ -399,7 +403,7 @@ export default function TaskBoard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>Due Date</Label><Input name="due_date" type="date" defaultValue={editTask?.due_date ?? ""} /></div>
+              <div><Label>Due Date & Time</Label><Input name="due_date" type="datetime-local" defaultValue={editTask?.due_date ? format(new Date(editTask.due_date), "yyyy-MM-dd'T'HH:mm") : ""} /></div>
             </div>
             {!editTask && (
               <div>
